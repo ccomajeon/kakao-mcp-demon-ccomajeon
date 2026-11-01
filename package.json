@@ -3,7 +3,7 @@
   "version": "0.2.0-rebuild.2",
   "description": "Unofficial headless KakaoTalk account daemon and MCP server for AI agents",
   "license": "MIT",
-  "author": "ziesski",
+  "author": "ccomajeon",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon.git"
