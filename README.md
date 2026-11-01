@@ -6,7 +6,7 @@
 
 ## 어떻게 개발했나요?
 
-[ziesski/kakao-max](https://github.com/ziesski/kakao-max)의 MIT 라이선스 소스를 기반으로 개발했습니다. 기존 계정 연결·승인·저장·MCP·CLI·웹 구현을 활용하고, 패킷 처리와 메시지 버퍼, 보안 검사 및 배포 구성을 개선했습니다.
+TypeScript와 Node.js로 구성하며, 계정 연결·권한·저장·MCP·CLI·웹을 역할별 모듈로 나누었습니다. 패킷 처리, 실시간 메시지 버퍼, 승인 정책과 배포 구성을 다음과 같이 구현합니다.
 
 - **TypeScript 모노레포:** npm workspaces로 통신·계정 처리·클라이언트·실행 앱을 나눕니다.
 - **프로토콜 처리:** LOCO 패킷의 헤더·길이·정수 범위를 검사하고 BSON 본문을 직렬화·역직렬화합니다. 잘린 패킷과 잘못된 입력은 오류로 거부합니다.
@@ -77,9 +77,9 @@ flowchart LR
 
 **권장 순서: Linux 서버에 패키지 설치 → 휴대폰으로 로그인 승인 → AI 연결 → 웹이나 터미널에서 사용.**
 
-이 버전은 npm 레지스트리에 게시하지 않았습니다. 아래 명령은 로컬 패키지 `kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz`를 사용합니다. 파일이 없다면 먼저 [소스 개발과 패키지 빌드](#소스-개발과-패키지-빌드)의 명령으로 만드세요. `npm install -g kakao-max`만 실행하면 원본 공개 패키지가 설치됩니다.
+이 버전은 npm 레지스트리에 게시하지 않았습니다. 아래 명령은 로컬 패키지 `kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz`를 사용합니다. 파일이 없다면 먼저 [소스 개발과 패키지 빌드](#소스-개발과-패키지-빌드)의 명령으로 만드세요.
 
-패키지명과 기본 실행 명령은 `kakao-mcp-ccomajeon`입니다. 기존 `kakao-max`, `kakao-max-mcp`, `kakao-max-web` 명령은 호환 별칭으로 남겨 두었습니다. 기존 설치를 이어 쓰도록 데이터 경로 `/var/lib/kakao-max`, 서비스 `kakao-max.service`, 설정 경로 `~/.config/kakao-max/mcp.json`, MCP 등록 키 `kakao-max`, 내부 워크스페이스 이름은 유지합니다. 두 이름의 패키지를 동시에 전역 설치하면 명령이 충돌할 수 있으므로 하나만 설치하세요.
+패키지명과 기본 실행 명령은 `kakao-mcp-ccomajeon`입니다. 서버 데이터 경로는 `/var/lib/kakao-max`, 서비스는 `kakao-max.service`, 클라이언트 설정 경로는 `~/.config/kakao-max/mcp.json`, MCP 등록 키는 `kakao-max`입니다.
 
 ### 1. 서버 준비와 설치
 
@@ -251,11 +251,11 @@ npm pack
 
 실제 계정 로그인·휴대폰 인증·실서비스 송수신은 아직 검증하지 않았습니다. 건너뛴 검사는 systemd 격리, 실제 서비스 계정 설치, SSH 대상 연결, Windows 전용 동작입니다. 자동 테스트 결과를 해당 환경의 실제 운영 검증으로 해석하지 마세요.
 
-현재 버전은 npm 레지스트리에 게시하지 않았습니다. 위에 안내한 로컬 `.tgz` 파일로 설치합니다. 시스템 서비스와 데이터 경로의 기존 이름은 호환성을 위해 유지합니다.
+현재 버전은 npm 레지스트리에 게시하지 않았습니다. 위에 안내한 로컬 `.tgz` 파일로 설치합니다.
 
-## 라이선스와 출처
+## 라이선스
 
-MIT 라이선스입니다. [LICENSE](LICENSE)의 원저작자 고지를 유지합니다. 기반 프로젝트는 [ziesski/kakao-max](https://github.com/ziesski/kakao-max) 0.2.0이며, 이 저장소는 해당 코드를 포함한 파생 프로젝트입니다.
+MIT 라이선스입니다. 자세한 내용은 [LICENSE](LICENSE)를 참고하세요.
 
 Kakao의 공식 제품이 아니며 Kakao와 제휴하거나 승인을 받은 프로젝트가 아닙니다. KakaoTalk 및 관련 상표의 권리는 각 권리자에게 있습니다.
 
