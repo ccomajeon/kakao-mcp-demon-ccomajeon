@@ -65,18 +65,23 @@ try {
   const web = await new Promise(resolve => {
     // Started with node directly so that stopping it stops the server, not only a Windows shell around it.
     const child = spawn(process.execPath, [path.join(pkg, 'dist', 'web.mjs')], { cwd: work, env: { ...env, PORT: '0', MCP_PORT: '9' } });
-    let out = '';
-    const timer = setTimeout(() => { child.kill(); resolve({ ok: false }); }, 30_000);
+    let out = '', checking = false;
+    let result = { ok: false };
+    const timer = setTimeout(() => { child.kill(); }, 30_000);
+    // Windows locks a running process's working directory. Wait for its handles to close before cleanup.
+    child.once('close', () => { clearTimeout(timer); resolve(result); });
+    child.once('error', () => { clearTimeout(timer); resolve({ ok: false }); });
     child.stdout.on('data', async chunk => {
       out += chunk;
       const m = /http:\/\/127\.0\.0\.1:(\d+)\/launch\?t=/.exec(out);
-      if (!m) return;
+      if (!m || checking) return;
+      checking = true;
       clearTimeout(timer);
       try {
         const page = await fetch(`http://127.0.0.1:${m[1]}/`);
         const launch = await fetch(`http://127.0.0.1:${m[1]}/launch?t=wrong`, { redirect: 'manual' });
-        resolve({ ok: page.status === 401 && launch.status === 403 });
-      } catch { resolve({ ok: false }); }
+        result = { ok: page.status === 401 && launch.status === 403 };
+      } catch { result = { ok: false }; }
       finally { child.kill(); }
     });
   });
