@@ -1,5 +1,5 @@
 import { prepareAndCommit, REQUEST_ID } from './one-call.ts';
-import { canonicalAgentJson, KakaoError, toKakaoError, type KakaoSession, type AgentMutationAdapter, type AgentMutationService, type AgentMutationAction, type AgentMutationRequest } from '@kakao-max/core';
+import { canonicalAgentJson, KakaoError, toKakaoError, type KakaoSession, type AgentMutationAdapter, type AgentMutationService, type AgentMutationAction, type AgentMutationRequest } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

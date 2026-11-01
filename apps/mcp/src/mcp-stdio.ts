@@ -17,7 +17,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Readable, Writable } from 'node:stream';
-import { KakaoError, longReplacer, toKakaoError, type McpToolGroup } from '@kakao-max/core';
+import { KakaoError, longReplacer, toKakaoError, type McpToolGroup } from '@kakao-mcp/core';
 
 export type { McpToolGroup };
 import { validateArgs } from './validate-args.ts';

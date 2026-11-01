@@ -20,8 +20,8 @@ Git 명령 실패나 검사 용량 초과도 성공으로 처리하지 않습니
 CI의 배포된 검사기 바이너리는 버전과 SHA-256을 함께 고정합니다.
 
 `check:private-terms`는 추가된 줄·파일 이름·커밋 메시지·PR 제목과 설명에서 개인정보 패턴과 관리자의 비공개 용어 목록을
-찾습니다. 목록은 이 저장소에 없고, 로컬에서는 `KAKAO_MAX_DENYLIST_FILE` 또는 체크아웃 옆의 관리자 저장소에서,
-CI에서는 `KAKAO_MAX_DENYLIST` secret에서 읽습니다. 결과에는 위치만 나오고 일치한 값이나 목록 항목은 출력하지 않습니다.
+찾습니다. 목록은 이 저장소에 없고, 로컬에서는 `KAKAO_MCP_DENYLIST_FILE` 또는 체크아웃 옆의 관리자 저장소에서,
+CI에서는 `KAKAO_MCP_DENYLIST` secret에서 읽습니다. 결과에는 위치만 나오고 일치한 값이나 목록 항목은 출력하지 않습니다.
 PR 검사는 `pull_request_target`으로 base 브랜치의 검사기를 실행하며 PR 코드를 실행하지 않습니다.
 
 Linux CI가 실제로 시작돼 Node 22 테스트·systemd 권한 fixture까지 통과했는지 확인합니다.

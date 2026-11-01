@@ -102,7 +102,7 @@
 | 미디어 지속 보관(스트리밍) | (내부 데몬 플래그, `KAKAO_VAULT_AUTO_SAVE`) | 🟡 | 단위 테스트: 조각 sink 스트리밍 임시 파일 작성→원자적 확정, 크기·체크섬 검증 실패 시 파기, 디스크 상한(`KAKAO_VAULT_MAX_BYTES`/`KAKAO_VAULT_MIN_FREE_BYTES`), 순차 다운로드 속도 조절, 보낸 사람이 정한 파일 이름으로 vault 밖 경로 불가, 프레임 분할 수신, 유휴 시간 제한(총 시간 제한 없음) | 기본 꺼짐. 사용자 서버 자체 보관 기능. 로그에 ID·내용 미포함. `ask` 모드에서 켤 수 없게 하는 제약은 `KAKAO_AGENT_MODE` 구현 대기. 실서버 대용량 다운로드 ❓ |
 | 설치 마법사 | `npm run setup` (`scripts/install.sh`) | 🟡 | 2026-10-24 별도 테스트 계정 4자리 인증→systemd→SSH connected=true ✅는 이전 진입점 시절 | 진입점이 `scripts/install.sh`로 바뀐 뒤 재검증 필요. [설치 운영](runbooks/mcp-setup.md) |
 | 기존 데몬 연결 | `connect.ts` / setup 연결 설정 | 🟡 | 실제 Unix/TCP·SSH -W fixture | 실제 AI 앱·사람 승인 연결은 별도 증거(첫 발신) |
-| 관리형 설치 마이그레이션 | `update-managed.ts` (`--update-managed-mcp`) | ✅ | 2026-10-26 테스트 서버: `kakaotalk-mcp` → `kakao-max` 이전, Linux 전체 테스트 통과 후 실행, 서비스 enabled·재시작 0회·경고 0, uid/gid 유지, 새 기기 등록 없음, `get_status` connected(같은 계정). 단위 21건(: `KAKAO_AUDIT_LOG` 이동·옛 경로 설정 거부 포함) | `KAKAO_AUDIT_LOG`는 테스트 서버에서 손으로 옮겼고, 이를 자동으로 하는 코드는 단위 테스트만(🟡) |
+| 관리형 설치 마이그레이션 | `update-managed.ts` (`--update-managed-mcp`) | ✅ | 2026-10-26 테스트 서버: `kakaotalk-mcp` → `kakao-mcp` 이전, Linux 전체 테스트 통과 후 실행, 서비스 enabled·재시작 0회·경고 0, uid/gid 유지, 새 기기 등록 없음, `get_status` connected(같은 계정). 단위 21건(: `KAKAO_AUDIT_LOG` 이동·옛 경로 설정 거부 포함) | `KAKAO_AUDIT_LOG`는 테스트 서버에서 손으로 옮겼고, 이를 자동으로 하는 코드는 단위 테스트만(🟡) |
 
 ## 7. 막힘·범위 밖
 
@@ -140,7 +140,7 @@
 
 ### 웹 화면 (`apps/web`)
 
-`npm run web`(`kakao web`, 패키지의 `kakao-max-web`)은 데몬의 MCP 클라이언트인 로컬 브라우저 화면입니다. 새 도구·로그인 경로를 추가하지 않으며, 아래는 모두 실계정에서 확인하지 않았습니다.
+`npm run web`(`kakao web`, 패키지의 `kakao-mcp-web`)은 데몬의 MCP 클라이언트인 로컬 브라우저 화면입니다. 새 도구·로그인 경로를 추가하지 않으며, 아래는 모두 실계정에서 확인하지 않았습니다.
 
 | 기능 | 상태 | 검증 범위 |
 |---|---|---|

@@ -1,6 +1,6 @@
 // Optional "friends" group: address book, blocks and profiles (read-only). Friend, block and profile
 // changes are named operations or mutations that always need human approval.
-import { KakaoError, type KakaoSession } from '@kakao-max/core';
+import { KakaoError, type KakaoSession } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

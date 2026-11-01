@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, describeConfig, parseApprovalConfig, parseMcpToolGroups, parseRecipientLimit, parseAddFriendLimit, resetLegacyDataDirNoticeForTests } from './config.ts';
 import { KakaoError, toKakaoError, locoStatusError } from './errors.ts';
-import { LocoError } from '@kakao-max/protocol';
+import { LocoError } from '@kakao-mcp/protocol';
 
 const NO_FILE = path.join(os.tmpdir(), 'definitely-missing', '.env.local');
 
@@ -16,15 +16,15 @@ test('loadConfig applies defaults', () => {
   assert.ok(!describeConfig(c).includes('TOKEN'));
 });
 
-test('dataDir defaults to ~/.kakao-max on fresh install and falls back to ~/.kakao when existing', () => {
+test('dataDir defaults to ~/.kakao-mcp on fresh install and falls back to ~/.kakao when existing', () => {
   const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'home-cfg-'));
   try {
-    // 1. Fresh home: neither exists -> ~/.kakao-max (no empty folder created by loadConfig)
+    // 1. Fresh home: neither exists -> ~/.kakao-mcp (no empty folder created by loadConfig)
     const fresh = loadConfig({ envPath: NO_FILE, env: {}, homedir: tempHome });
-    assert.equal(fresh.dataDir, path.join(tempHome, '.kakao-max'));
-    assert.equal(fs.existsSync(path.join(tempHome, '.kakao-max')), false, 'loadConfig must never create the directory');
+    assert.equal(fresh.dataDir, path.join(tempHome, '.kakao-mcp'));
+    assert.equal(fs.existsSync(path.join(tempHome, '.kakao-mcp')), false, 'loadConfig must never create the directory');
 
-    // 2. Existing ~/.kakao and no ~/.kakao-max: keep using ~/.kakao and print one notice
+    // 2. Existing ~/.kakao and no ~/.kakao-mcp: keep using ~/.kakao and print one notice
     const legacyDir = path.join(tempHome, '.kakao');
     fs.mkdirSync(legacyDir);
     resetLegacyDataDirNoticeForTests();
@@ -35,7 +35,7 @@ test('dataDir defaults to ~/.kakao-max on fresh install and falls back to ~/.kak
     try {
       const legacyFirst = loadConfig({ envPath: NO_FILE, env: {}, homedir: tempHome });
       assert.equal(legacyFirst.dataDir, legacyDir);
-      assert.equal(fs.existsSync(path.join(tempHome, '.kakao-max')), false, 'never create empty store next to existing');
+      assert.equal(fs.existsSync(path.join(tempHome, '.kakao-mcp')), false, 'never create empty store next to existing');
       assert.equal(errLines.length, 1);
       assert.ok(errLines[0].includes('Using the legacy data directory'));
       assert.equal(errLines[0].includes(tempHome), false);
@@ -48,8 +48,8 @@ test('dataDir defaults to ~/.kakao-max on fresh install and falls back to ~/.kak
       console.error = origError;
     }
 
-    // 3. If ~/.kakao-max exists (migrated), it wins even if ~/.kakao also exists
-    const newDir = path.join(tempHome, '.kakao-max');
+    // 3. If ~/.kakao-mcp exists (migrated), it wins even if ~/.kakao also exists
+    const newDir = path.join(tempHome, '.kakao-mcp');
     fs.mkdirSync(newDir);
     const migrated = loadConfig({ envPath: NO_FILE, env: {}, homedir: tempHome });
     assert.equal(migrated.dataDir, newDir);

@@ -6,8 +6,8 @@ import { removeTestDir } from '../../../packages/core/src/temp-dir.test-helper.t
 import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import { KakaoDb, KakaoSession, loadConfig } from '@kakao-max/core';
-import type { ResilientLocoSession } from '@kakao-max/protocol';
+import { KakaoDb, KakaoSession, loadConfig } from '@kakao-mcp/core';
+import type { ResilientLocoSession } from '@kakao-mcp/protocol';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { registerVaultTools } from './tools/vault.ts';
 

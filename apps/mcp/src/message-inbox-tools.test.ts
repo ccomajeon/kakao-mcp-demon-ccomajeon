@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Writable } from 'node:stream';
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { registerMessageInboxTools } from './tools/message-inbox.ts';
 

@@ -23,7 +23,7 @@ test('generated SSH stdio config carries discover, prepare, elicitation retry an
     control.stdout.on('data', c => { text += c.toString(); const end = text.indexOf('\n'); if (end !== -1) { clearTimeout(timer); try { resolve(JSON.parse(text.slice(0, end))); } catch (e) { reject(e); } } });
   });
   assert.ok(Number.isInteger(ready.fixturePort) && ready.fixturePort > 1024 && ready.fixturePort < 65536);
-  const config = connectionConfig({ ssh: host, listen: `127.0.0.1:${ready.fixturePort}` }).mcpServers['kakao-max'];
+  const config = connectionConfig({ ssh: host, listen: `127.0.0.1:${ready.fixturePort}` }).mcpServers['kakao-mcp'];
   const client = spawn(config.command, config.args); t.after(() => { client.stdin.end(); client.kill(); });
   let buffer = '', id = 0, clientErr = '';
   client.stderr.on('data', c => { clientErr += c.toString(); });

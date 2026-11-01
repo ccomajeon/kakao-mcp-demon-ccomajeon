@@ -1,4 +1,4 @@
-# @kakao-max/mcp
+# @kakao-mcp/mcp
 
 하나의 core 계정 세션 위에 MCP 도구를 제공합니다. 현재 계약은
 [도구·권한](../../docs/tool-contract.md), 설치는 [빠른 시작](../../docs/QUICKSTART.md),
@@ -28,7 +28,7 @@ npm run typecheck
 상시 데몬을 대상으로 하는 상태 검사:
 
 ```bash
-KAKAO_MCP_LISTEN=127.0.0.1:8787 npm run health --workspace=@kakao-max/mcp
+KAKAO_MCP_LISTEN=127.0.0.1:8787 npm run health --workspace=@kakao-mcp/mcp
 ```
 
 계정 충돌 시 기존 runtime을 재사용하거나 사람이 명시적으로 계정 이전을 선택해야 합니다.

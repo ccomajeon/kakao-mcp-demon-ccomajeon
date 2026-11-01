@@ -1,6 +1,6 @@
 // Optional "chats" group: room details and local-only actions. Account-visible room changes
 // (leave, notice, read receipt, CREATE) are named operations in agent-operations.ts.
-import { KakaoError, type KakaoSession } from '@kakao-max/core';
+import { KakaoError, type KakaoSession } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import { readGrant } from '../read-grant.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';

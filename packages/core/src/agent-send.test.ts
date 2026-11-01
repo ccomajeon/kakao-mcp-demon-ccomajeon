@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, type AgentMessage, type AgentSendAdapter } from './agent-send.ts';
-import { LocoError } from '@kakao-max/protocol';
+import { LocoError } from '@kakao-mcp/protocol';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';
 import { SendPolicy } from './policy.ts';
 import { KakaoError } from './errors.ts';

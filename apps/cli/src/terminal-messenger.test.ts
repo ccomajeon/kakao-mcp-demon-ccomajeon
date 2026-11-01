@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { TerminalMessenger, terminalWidth } from './terminal-messenger.ts';
 import { McpToolError } from './mcp-client.ts';
-import type { ConversationReader, MessageWriter } from '@kakao-max/client';
+import type { ConversationReader, MessageWriter } from '@kakao-mcp/client';
 
 function fixture(demo = true) {
   const calls: { name: string; args: Record<string, any> }[] = [];

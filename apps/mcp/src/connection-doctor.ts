@@ -1,4 +1,4 @@
-import { setupCommand } from '@kakao-max/core';
+import { setupCommand } from '@kakao-mcp/core';
 import { openDaemon, type ConnectionOptions } from './daemon-connection.ts';
 import { probe } from './healthcheck.ts';
 

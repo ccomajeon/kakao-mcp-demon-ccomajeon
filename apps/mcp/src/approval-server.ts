@@ -3,7 +3,7 @@
 // with user verification, so neither a token holder nor browser automation can approve.
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { KakaoError, approvalChallenge, rpIdForOrigin, verifyWebAuthnRegistration, type ApproverRegistry } from '@kakao-max/core';
+import { KakaoError, approvalChallenge, rpIdForOrigin, verifyWebAuthnRegistration, type ApproverRegistry } from '@kakao-mcp/core';
 import type { ApprovalCenter } from './approval-center.ts';
 import { approvalLabel } from './client-approval.ts';
 import { checkEnrollment, clearEnrollment } from './enrollment.ts';

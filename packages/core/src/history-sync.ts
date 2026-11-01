@@ -13,7 +13,7 @@
 // messageId). Uses the daemon's existing LOCO session; never opens a second connection.
 // ----------------------------------------------------------------------------
 
-import type { IncomingMessage, SyncResult } from '@kakao-max/protocol';
+import type { IncomingMessage, SyncResult } from '@kakao-mcp/protocol';
 import type { MessageStore, StoredMessage } from './message-store.ts';
 
 export interface SyncSource {

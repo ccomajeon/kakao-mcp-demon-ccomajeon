@@ -3,7 +3,7 @@ import net from 'node:net';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { Duplex } from 'node:stream';
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 import { parseListenSpec, validateListenSpec } from './socket-transport.ts';
 
 export interface ConnectionOptions { listen: string; ssh?: string }

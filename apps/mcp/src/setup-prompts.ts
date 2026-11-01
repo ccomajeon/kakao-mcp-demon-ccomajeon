@@ -1,5 +1,5 @@
 // Human-only setup input; account secrets are never echoed or passed as command arguments.
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 import { StringDecoder } from 'node:string_decoder';
 
 export type SetupPrompt = (question: string, secret?: boolean) => Promise<string>;

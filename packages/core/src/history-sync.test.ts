@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { removeTestDir } from './temp-dir.test-helper.ts';
 import path from 'node:path';
 import os from 'node:os';
-import type { SyncResult } from '@kakao-max/protocol';
+import type { SyncResult } from '@kakao-mcp/protocol';
 import { MessageStore } from './message-store.ts';
 import { KakaoDb } from './db.ts';
 import { backfillHistory, mchatLogsSource, type SyncSource } from './history-sync.ts';

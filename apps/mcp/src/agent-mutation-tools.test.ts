@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PassThrough, Writable } from 'node:stream';
-import { AgentMutationService, AgentSendJournal, KakaoError, SendPolicy, type KakaoSession } from '@kakao-max/core';
+import { AgentMutationService, AgentSendJournal, KakaoError, SendPolicy, type KakaoSession } from '@kakao-mcp/core';
 import { agentMutationAdapter, registerAgentMutationTools } from './tools/agent-mutations.ts';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';

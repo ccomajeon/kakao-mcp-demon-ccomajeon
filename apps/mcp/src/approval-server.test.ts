@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, RecipientPermissions, SendPolicy, approvalChallenge } from '@kakao-max/core';
+import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, RecipientPermissions, SendPolicy, approvalChallenge } from '@kakao-mcp/core';
 import { ApprovalCenter } from './approval-center.ts';
 import { createApprovalServer } from './approval-server.ts';
 import { createEnrollment, enrollmentFile } from './enrollment.ts';

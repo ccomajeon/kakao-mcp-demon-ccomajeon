@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { AGENT_MUTATION_ACTIONS, AGENT_CONTROL_ACTIONS, agentOperationDefinition, parseAgentMutationRequest, type AgentMutationAction, KakaoError, parseAgentMessage, normalizeAgentPublication, type AgentPublicationAction, isOwnerOnly } from '@kakao-max/core';
+import { AGENT_MUTATION_ACTIONS, AGENT_CONTROL_ACTIONS, agentOperationDefinition, parseAgentMutationRequest, type AgentMutationAction, KakaoError, parseAgentMessage, normalizeAgentPublication, type AgentPublicationAction, isOwnerOnly } from '@kakao-mcp/core';
 import { submitWrite, type AgentToolClient } from './agent-send-client.ts';
 
 /** Explicit operator-supplied file; no draft is automatically persisted. */

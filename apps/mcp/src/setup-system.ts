@@ -6,14 +6,14 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { KakaoDeviceRegistration, type SignRegistrationResult } from '@kakao-max/protocol';
-import { KakaoError, isMainModule, installRoot, packagedEntry, programArgs, TRUST_RISK_NOTICE, type AgentMode } from '@kakao-max/core';
+import { KakaoDeviceRegistration, type SignRegistrationResult } from '@kakao-mcp/protocol';
+import { KakaoError, isMainModule, installRoot, packagedEntry, programArgs, TRUST_RISK_NOTICE, type AgentMode } from '@kakao-mcp/core';
 import { confirmSetup, terminalPrompt, type SetupPrompt } from './setup-prompts.ts';
 import { probe } from './healthcheck.ts';
 import { parseEnv } from '../../../packages/core/src/env-file.ts';
 import { installRelease, readRelease, releaseDigest, releaseFiles, releaseLabel, RELEASE_DIGEST, RELEASE_VERSION, type Release } from './release.ts';
 
-const SERVICE = 'kakao-max';
+const SERVICE = 'kakao-mcp';
 function present(file: string): boolean {
   try { fs.lstatSync(file); return true; }
   catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false; throw e; }
@@ -33,7 +33,7 @@ export interface BootstrapHost {
   port?: number;
   /** The human who ran setup with sudo (SUDO_UID): their SSH tunnel is the one the daemon serves. */
   operatorUid?: number;
-  /** Internal isolation for explicit OS tests; the CLI always uses kakao-max. */
+  /** Internal isolation for explicit OS tests; the CLI always uses kakao-mcp. */
   serviceName?: string;
   /** Install this published package release instead of the Git checkout at `repo`. */
   release?: Release;
@@ -57,7 +57,7 @@ function writePrivate(file: string, text: string, uid = process.getuid!(), gid =
   try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
 }
 
-export function serviceUnit(app: string, data: string, node: string, service = SERVICE, description = 'kakao-max account daemon', layout: 'source' | 'package' = 'source'): string {
+export function serviceUnit(app: string, data: string, node: string, service = SERVICE, description = 'kakao-mcp account daemon', layout: 'source' | 'package' = 'source'): string {
   if (!/^[a-z][a-z0-9-]{0,30}$/.test(service)) throw new KakaoError('CONFIG_INVALID', 'Invalid service identity');
   for (const value of [app, data, node]) if (!path.isAbsolute(value) || /[\x00-\x1f\x7f]/.test(value)) {
     throw new KakaoError('CONFIG_INVALID', 'Service paths must be absolute and contain no control characters');
@@ -99,7 +99,7 @@ export async function chooseAgentMode(prompt: SetupPrompt, log: (text: string) =
 export async function bootstrapLocal(h: BootstrapHost): Promise<'ready' | 'configured' | 'cancelled'> {
   const port = installPort(String(h.port ?? 8787)), listen = `127.0.0.1:${port}`;
   const service = h.serviceName ?? SERVICE, unit = `${service}.service`;
-  if (!/^kakao-max(?:-[a-f0-9]{8})?$/.test(service)) throw new KakaoError('CONFIG_INVALID', 'Invalid managed service identity');
+  if (!/^kakao-mcp(?:-[a-f0-9]{8})?$/.test(service)) throw new KakaoError('CONFIG_INVALID', 'Invalid managed service identity');
   if (!h.reason.trim() || h.reason.length > 256 || /[\x00-\x1f\x7f]/.test(h.reason)) throw new KakaoError('INVALID_ARGUMENT', 'A short deployment reason is required');
   ownerPath(path.dirname(h.root), true);
   const lock = `${h.root}.install-lock`;
@@ -132,7 +132,7 @@ export async function bootstrapLocal(h: BootstrapHost): Promise<'ready' | 'confi
       state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
       if (pkg ? state.version === 1 : state.version === 2) {
         throw new KakaoError('CONFIG_INVALID', pkg ? 'This installation was set up from a source checkout; update it from that checkout'
-          : 'This installation was set up from the kakao-max package; update it with kakao-max setup --update');
+          : 'This installation was set up from the kakao-mcp package; update it with kakao-mcp setup --update');
       }
       const validPin = state.version === 1 ? /^[a-f0-9]{40}$/.test(state.commit) : state.version === 2 && RELEASE_VERSION.test(state.release) && RELEASE_DIGEST.test(state.digest);
       if (!validPin || (state.port ?? 8787) !== port || !['building','prepared','configured','running'].includes(state.phase) ||
@@ -175,7 +175,7 @@ export async function bootstrapLocal(h: BootstrapHost): Promise<'ready' | 'confi
         h.run('useradd', ['--system', '--user-group', '--no-create-home', '--home-dir', h.root, '--shell', '/usr/sbin/nologin', service]);
       }
       if (pkg) {
-        h.log(`kakao-max 패키지 ${pin}의 파일을 서비스 영역에 복사합니다. 빌드와 내려받기는 하지 않습니다.`);
+        h.log(`kakao-mcp 패키지 ${pin}의 파일을 서비스 영역에 복사합니다. 빌드와 내려받기는 하지 않습니다.`);
         if (!fs.existsSync(app)) fs.mkdirSync(app, { mode: 0o755 });
         ownerPath(app, true);
         installRelease(pkg, app);
@@ -327,12 +327,12 @@ export function protectedRelease(dir: string): Release {
   const release = readRelease(resolved);
   for (const rel of releaseFiles(resolved)) {
     const stat = fs.lstatSync(path.join(resolved, rel));
-    if (stat.uid !== 0 || (stat.mode & 0o022)) throw new KakaoError('CONFIG_INVALID', 'Install requires a system-wide kakao-max package (sudo npm install -g kakao-max), outside user-writable directories');
+    if (stat.uid !== 0 || (stat.mode & 0o022)) throw new KakaoError('CONFIG_INVALID', 'Install requires a system-wide kakao-mcp package (sudo npm install -g ./kakao-mcp-ccomajeon-<version>.tgz), outside user-writable directories');
   }
   const dirs = new Set(releaseFiles(resolved).map(rel => path.dirname(path.join(resolved, rel))));
   for (const dir of dirs) {
     const stat = fs.lstatSync(dir);
-    if (stat.uid !== 0 || (stat.mode & 0o022)) throw new KakaoError('CONFIG_INVALID', 'Install requires a system-wide kakao-max package, outside user-writable directories');
+    if (stat.uid !== 0 || (stat.mode & 0o022)) throw new KakaoError('CONFIG_INVALID', 'Install requires a system-wide kakao-mcp package, outside user-writable directories');
   }
   return release;
 }
@@ -351,7 +351,7 @@ function protectedExecutable(file: string): string {
 if (isMainModule(import.meta.url, 'setup-system')) {
   const main = async () => {
     if (!(process.argv.length === 4 || process.argv.length === 6 && process.argv[4] === '--port') || process.argv[2] !== '--via-deploy' || process.platform !== 'linux' || process.getuid?.() !== 0 || !process.stdin.isTTY || !process.stderr.isTTY) {
-      throw new KakaoError('APPROVAL_REQUIRED', packagedEntry() ? 'Run the Linux installation wizard from a human terminal with kakao-max setup'
+      throw new KakaoError('APPROVAL_REQUIRED', packagedEntry() ? 'Run the Linux installation wizard from a human terminal with kakao-mcp setup'
         : 'Run the Linux installation wizard from a human terminal with sudo scripts/install.sh bootstrap');
     }
     const port = installPort(process.argv[5] ?? '8787');
@@ -376,12 +376,12 @@ if (isMainModule(import.meta.url, 'setup-system')) {
       s.once('connect', () => { s.setTimeout(0); probe(s, 3000).then(r => finish(r.healthy && r.userId === expectedUserId)); });
       s.once('error', () => finish(false)); s.once('timeout', () => finish(false));
     });
-    const outcome = await bootstrapLocal({ repo: installRoot(), release, root: '/var/lib/kakao-max',
-      unitFile: '/etc/systemd/system/kakao-max.service', node, npm, run, prompt: terminalPrompt, log: s => process.stderr.write(s + '\n'), occupied, healthy,
+    const outcome = await bootstrapLocal({ repo: installRoot(), release, root: '/var/lib/kakao-mcp',
+      unitFile: '/etc/systemd/system/kakao-mcp.service', node, npm, run, prompt: terminalPrompt, log: s => process.stderr.write(s + '\n'), occupied, healthy,
       reason: process.argv[3], port,
       operatorUid: /^[1-9]\d{0,9}$/.test(process.env.SUDO_UID ?? '') ? Number(process.env.SUDO_UID) : undefined,
       wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
-      register: (email, password, uuid, takeover) => new KakaoDeviceRegistration('kakao-max Linux', {}, uuid).register(email, password, {
+      register: (email, password, uuid, takeover) => new KakaoDeviceRegistration('kakao-mcp Linux', {}, uuid).register(email, password, {
         confirmTakeover: takeover,
         // Closed stage/status diagnostics only: never print raw responses or account input.
         onResponse: trace => {

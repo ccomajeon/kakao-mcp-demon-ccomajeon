@@ -1,5 +1,5 @@
 // Ordinary login only: no takeover, registration, or speculative renewal endpoint.
-import { KakaoAuthClient, type RefreshedCredentials } from '@kakao-max/protocol';
+import { KakaoAuthClient, type RefreshedCredentials } from '@kakao-mcp/protocol';
 import type { CredentialStore } from './credentials.ts';
 import type { KakaoConfig } from './config.ts';
 import type { AuthReloginBudget } from './auth-relogin-budget.ts';

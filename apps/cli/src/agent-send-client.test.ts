@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { sendMessage, sendPhotos, submitWrite, approvalLink, type AgentToolClient } from './agent-send-client.ts';
 import { readAgentRequest, runAgentFileCommand, agentFileTool } from './agent-send-files.ts';
 import { McpToolError } from './mcp-client.ts';
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 
 const approvalNeeded = (tool: string) => new McpToolError(tool, 'Human approval is required', 'APPROVAL_REQUIRED', false,
   { approval: { requestId: 'x' }, passkey: { approvalUrl: 'https://approve.example.test/a/x#token' } });

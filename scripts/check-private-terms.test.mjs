@@ -12,7 +12,7 @@ const privateEmail = ['fixture-person', 'fixture-company.org'].join('@');
 function scan(t, options = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'kakao-scanner-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const env = { ...process.env, KAKAO_MAX_DENYLIST: options.deny ?? 'fixture-never-match',
+  const env = { ...process.env, KAKAO_MCP_DENYLIST: options.deny ?? 'fixture-never-match',
     GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: options.authorEmail ?? 'fixture@example.com',
     GIT_COMMITTER_NAME: options.committerName ?? 'GitHub', GIT_COMMITTER_EMAIL: options.committerEmail ?? generated };
   const git = args => execFileSync('git', args, { cwd: dir, env, stdio: 'pipe' });

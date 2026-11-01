@@ -9,7 +9,7 @@ import { KakaoDb } from './db.ts';
 import { MessageStore } from './message-store.ts';
 
 // bson is the protocol package's dependency; resolve it from there rather than declaring it here.
-const { Long } = createRequire(import.meta.resolve('@kakao-max/protocol'))('bson');
+const { Long } = createRequire(import.meta.resolve('@kakao-mcp/protocol'))('bson');
 
 test('longReplacer writes BSON Longs and bigints as decimal strings', () => {
   const raw = { revision: Long.fromString('1314563041929588736'), n: 7n, nested: [{ id: Long.fromNumber(42) }], s: 'x' };

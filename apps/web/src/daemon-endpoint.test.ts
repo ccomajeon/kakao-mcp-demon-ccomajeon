@@ -46,7 +46,7 @@ test('ssh runs stdio forwarding only: no remote command, no prompts, no local po
 
 test('the bridge speaks MCP through the ssh stdio stream and reconnects when ssh exits', { skip: process.platform === 'win32' }, async (t) => {
   // A stand-in for ssh: records its arguments, answers initialize and one tool call, then exits on request.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kakao-max-web-ssh-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kakao-mcp-web-ssh-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const log = path.join(dir, 'argv.log'), fake = path.join(dir, 'fake-ssh');
   fs.writeFileSync(fake, `#!${process.execPath}
@@ -77,5 +77,5 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
 test('the GUI refuses an unsafe --ssh before it starts', () => {
   const entry = fileURLToPath(new URL('./index.ts', import.meta.url));
   const r = spawnSync(process.execPath, ['--experimental-strip-types', entry, '--ssh', '-oProxyCommand=touch'], { env: { ...process.env, PORT: '0' }, encoding: 'utf8', timeout: 10_000 });
-  assert.equal(r.status, 2); assert.match(r.stderr, /Usage: kakao-max-web/); assert.doesNotMatch(r.stdout, /launch\?t=/);
+  assert.equal(r.status, 2); assert.match(r.stderr, /Usage: kakao-mcp-web/); assert.doesNotMatch(r.stdout, /launch\?t=/);
 });

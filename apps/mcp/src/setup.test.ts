@@ -20,13 +20,13 @@ test('setup confirmations accept simple answers and Enter defaults, and retry in
 });
 
 test('remote MCP settings use SSH stdio forwarding with no remote command or credentials', () => {
-  const config = connectionConfig({ ssh: 'operator@example.test' }).mcpServers['kakao-max'];
+  const config = connectionConfig({ ssh: 'operator@example.test' }).mcpServers['kakao-mcp'];
   assert.equal(config.command, process.execPath); assert.ok(config.args.includes('--resilient')); assert.deepEqual(config.args.slice(-2), ['--ssh', 'operator@example.test']);
   for (const bad of ['-oProxyCommand=bad','user@host;id','user@host x','$(id)','user@-flag']) {
     assert.throws(() => connectionConfig({ ssh: bad }), { code: 'INVALID_ARGUMENT' });
   }
   assert.throws(() => connectionConfig({ ssh: 'host', listen: '0.0.0.0:8787' }), { code: 'CONFIG_INVALID' });
-  const local = connectionConfig({ repo: '/tmp/fixture repo', node: '/usr/bin/node' }).mcpServers['kakao-max'];
+  const local = connectionConfig({ repo: '/tmp/fixture repo', node: '/usr/bin/node' }).mcpServers['kakao-mcp'];
   assert.equal(local.command, '/usr/bin/node'); assert.ok(local.args.includes(path.join('/tmp/fixture repo', 'apps/mcp/src/connect.ts')));
   assert.ok(!JSON.stringify(local).includes('src/index.ts'));
 });
@@ -39,8 +39,8 @@ test('existing-daemon wizard never invokes install/login and does not edit an AI
   await runSetup({ repo: root, platform: 'linux', configFile: file, prompt: async () => answers.shift()!,
     log: () => {}, output: s => { output = s; }, install: () => { installs++; return true; } });
   assert.equal(installs, 0); if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  assert.equal(JSON.parse(output).mcpServers['kakao-max'].command, process.execPath);
-  assert.ok(JSON.parse(output).mcpServers['kakao-max'].args.includes('127.0.0.1:18787'));
+  assert.equal(JSON.parse(output).mcpServers['kakao-mcp'].command, process.execPath);
+  assert.ok(JSON.parse(output).mcpServers['kakao-mcp'].args.includes('127.0.0.1:18787'));
   assert.deepEqual(fs.readdirSync(root), ['settings']);
 });
 
@@ -72,10 +72,10 @@ test('new install requires Linux and a simple confirmation, and noninteractive d
   const result = spawnSync(process.execPath, ['--experimental-strip-types', script], { input: '', encoding: 'utf8', timeout: 5000 });
   assert.equal(result.status, 1); assert.equal(result.stdout, ''); assert.ok(!fs.existsSync(deps.configFile));
   const config = spawnSync(process.execPath, ['--experimental-strip-types', script, '--config','--ssh','server.test'], { encoding: 'utf8', timeout: 5000 });
-  assert.equal(config.status, 0); assert.equal(JSON.parse(config.stdout).mcpServers['kakao-max'].command, process.execPath);
+  assert.equal(config.status, 0); assert.equal(JSON.parse(config.stdout).mcpServers['kakao-mcp'].command, process.execPath);
   const alternate = spawnSync(process.execPath, ['--experimental-strip-types', script, '--config','--ssh','server.test','--listen','127.0.0.1:18787'], { encoding: 'utf8', timeout: 5000 });
   assert.equal(alternate.status, 0);
-  assert.ok(JSON.parse(alternate.stdout).mcpServers['kakao-max'].args.includes('127.0.0.1:18787'));
+  assert.ok(JSON.parse(alternate.stdout).mcpServers['kakao-mcp'].args.includes('127.0.0.1:18787'));
   const exposed = spawnSync(process.execPath, ['--experimental-strip-types', script, '--config','--listen','0.0.0.0:18787'], { encoding: 'utf8', timeout: 5000 });
   assert.equal(exposed.status, 1); assert.equal(exposed.stdout, '');
 });
@@ -96,17 +96,17 @@ test('right after a server install the wizard asks no SSH questions and prints r
   await runSetup({ repo: root, platform: 'linux', configFile: path.join(root, 'settings/mcp.json'),
     prompt: async q => { asked.push(q); return answers.shift() ?? ''; }, install: () => true, log: s => logs.push(s), output: s => { output = s; } });
   assert.equal(asked.length, 3, 'only the choice, the install confirmation and the port');
-  const args = JSON.parse(output).mcpServers['kakao-max'].args as string[];
+  const args = JSON.parse(output).mcpServers['kakao-mcp'].args as string[];
   assert.ok(args.includes('127.0.0.1:18787')); assert.ok(!args.includes('--ssh'));
   const text = logs.join('\n');
-  assert.match(text, /claude mcp add --scope user kakao-max -- /); assert.match(text, /codex mcp add kakao-max -- /);
+  assert.match(text, /claude mcp add --scope user kakao-mcp -- /); assert.match(text, /codex mcp add kakao-mcp -- /);
   assert.match(text, /--config --ssh <이 서버의 SSH 대상> --listen 127\.0\.0\.1:18787/);
 });
 
 test('client commands quote paths with spaces for the platform shell', () => {
-  const config = { mcpServers: { 'kakao-max': { command: '/opt/my node/bin/node', args: ['connect.mjs', '--listen', '127.0.0.1:8787', "it's"] } } };
+  const config = { mcpServers: { 'kakao-mcp': { command: '/opt/my node/bin/node', args: ['connect.mjs', '--listen', '127.0.0.1:8787', "it's"] } } };
   assert.ok(registrationHint(config, 'linux').includes(`-- '/opt/my node/bin/node' connect.mjs --listen 127.0.0.1:8787 'it'\\''s'`));
-  const win = { mcpServers: { 'kakao-max': { command: 'C:\\Program Files\\nodejs\\node.exe', args: ['--listen', '127.0.0.1:8787'] } } };
+  const win = { mcpServers: { 'kakao-mcp': { command: 'C:\\Program Files\\nodejs\\node.exe', args: ['--listen', '127.0.0.1:8787'] } } };
   assert.ok(registrationHint(win, 'win32').includes('-- "C:\\Program Files\\nodejs\\node.exe" --listen 127.0.0.1:8787'));
 });
 
@@ -119,13 +119,13 @@ test('--mode writes the managed daemon settings on an installed server, through 
   assert.deepEqual(modeSettingsTarget({ env: '/tmp/x/.env.local', platform: 'linux', managedInstalled: true, isRoot: false, nearest }), { envPath: '/tmp/x/.env.local', managed: false, needsSudo: false });
 });
 
-test('resolveClientConfigFile defaults to kakao-max and falls back to legacy kakaotalk-mcp when only legacy exists', async t => {
+test('resolveClientConfigFile defaults to kakao-mcp and falls back to legacy kakaotalk-mcp when only legacy exists', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-cfg-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  // 1. Fresh: neither exists -> returns .config/kakao-max/mcp.json (not fallback)
+  // 1. Fresh: neither exists -> returns .config/kakao-mcp/mcp.json (not fallback)
   const fresh = resolveClientConfigFile(root);
-  assert.equal(fresh.file, path.join(root, '.config/kakao-max/mcp.json'));
+  assert.equal(fresh.file, path.join(root, '.config/kakao-mcp/mcp.json'));
   assert.equal(fresh.isFallback, false);
 
   // 2. Only legacy exists: returns legacy path with isFallback: true
@@ -137,7 +137,7 @@ test('resolveClientConfigFile defaults to kakao-max and falls back to legacy kak
   assert.equal(legacy.isFallback, true);
 
   // 3. New exists: returns new path with isFallback: false even if legacy also exists
-  const newDir = path.join(root, '.config/kakao-max');
+  const newDir = path.join(root, '.config/kakao-mcp');
   fs.mkdirSync(newDir, { recursive: true });
   fs.writeFileSync(path.join(newDir, 'mcp.json'), '{}');
   const migrated = resolveClientConfigFile(root);

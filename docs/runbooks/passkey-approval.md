@@ -54,15 +54,15 @@ KAKAO_APPROVAL_WINDOWS={"leave_chat":5}       # 선택: action별 덮어쓰기(5
 데몬이 도는 호스트의 **대화형 터미널**에서, 데몬과 같은 사용자로:
 
 ```bash
-npm run approver --workspace=@kakao-max/mcp -- enroll
+npm run approver --workspace=@kakao-mcp/mcp -- enroll
 ```
 
 1회용 등록 코드(10분, 5회 틀리면 폐기)와 `<origin>/enroll` 주소가 나온다. 그 주소를 승인에 쓸 기기에서 열고 코드를 넣은 뒤
-패스키를 만든다. 등록은 `~/.kakao-max/approvers.json`(0600, 기존 설치는 `~/.kakao/approvers.json`)에 기록된다. MCP에는 등록·삭제 도구가 없다.
+패스키를 만든다. 등록은 `~/.kakao-mcp/approvers.json`(0600, 기존 설치는 `~/.kakao/approvers.json`)에 기록된다. MCP에는 등록·삭제 도구가 없다.
 
 ```bash
-npm run approver --workspace=@kakao-max/mcp -- list
-npm run approver --workspace=@kakao-max/mcp -- remove <id>   # 그 패스키로 받은 기존 승인도 즉시 무효
+npm run approver --workspace=@kakao-mcp/mcp -- list
+npm run approver --workspace=@kakao-mcp/mcp -- remove <id>   # 그 패스키로 받은 기존 승인도 즉시 무효
 ```
 
 ## 위협 모델 한계

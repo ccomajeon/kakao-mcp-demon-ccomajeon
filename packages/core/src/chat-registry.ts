@@ -9,7 +9,7 @@
 // `fetchMembers` (LOCO MEMBER) and cached.
 // ----------------------------------------------------------------------------
 
-import type { ChannelMember, ChannelMeta, IncomingMessage } from '@kakao-max/protocol';
+import type { ChannelMember, ChannelMeta, IncomingMessage } from '@kakao-mcp/protocol';
 import type { KnownChats } from './known-chats.ts';
 import type { MessageStore } from './message-store.ts';
 import type { FriendsStore } from './friends.ts';

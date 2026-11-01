@@ -1,5 +1,5 @@
 // Bounded live event stream. Sequence numbers never depend on physical ring positions.
-import type { IncomingMessage, ReadReceipt } from '@kakao-max/protocol';
+import type { IncomingMessage, ReadReceipt } from '@kakao-mcp/protocol';
 import { KakaoError } from './errors.ts';
 
 export interface BufferedMessage extends IncomingMessage {

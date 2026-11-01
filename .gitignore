@@ -19,7 +19,7 @@ secrets/
 
 # Account stores, exports and enrollment state (never fixtures in source files)
 .kakao/
-.kakao-max/
+.kakao-mcp/
 vault/
 downloads/
 *.db

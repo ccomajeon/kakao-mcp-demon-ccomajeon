@@ -4,7 +4,7 @@
 
 카카오톡 계정 하나를 Linux 서버의 데몬에 연결하고, AI·터미널·웹에서 사용하는 비공식 MCP 서버입니다. AI는 허용된 대화를 조회하고 메시지를 보낼 수 있으며, 사람은 방별 권한과 승인 절차로 접근을 제어합니다.
 
-**현재 버전:** `0.2.0-rebuild.2` · **Node.js:** 22.18 이상 · **기본 도구:** 16개 · **전체 도구:** 41개
+**현재 버전:** `0.2.0-rebuild.3` · **Node.js:** 22.18 이상 · **기본 도구:** 16개 · **전체 도구:** 41개
 
 ## 어떻게 개발했나요?
 
@@ -79,9 +79,11 @@ flowchart LR
 
 **권장 순서: Linux 서버에 패키지 설치 → 휴대폰으로 로그인 승인 → AI 연결 → 웹이나 터미널에서 사용.**
 
-이 버전은 npm 레지스트리에 게시하지 않았습니다. 아래 명령은 로컬 패키지 `kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz`를 사용합니다. 파일이 없다면 먼저 [소스 개발과 패키지 빌드](#소스-개발과-패키지-빌드)의 명령으로 만드세요.
+이 버전은 npm 레지스트리에 게시하지 않았습니다. 아래 명령은 로컬 패키지 `kakao-mcp-ccomajeon-0.2.0-rebuild.3.tgz`를 사용합니다. 파일이 없다면 먼저 [소스 개발과 패키지 빌드](#소스-개발과-패키지-빌드)의 명령으로 만드세요.
 
-패키지명과 기본 실행 명령은 `kakao-mcp-ccomajeon`입니다. 서버 데이터 경로는 `/var/lib/kakao-max`, 서비스는 `kakao-max.service`, 클라이언트 설정 경로는 `~/.config/kakao-max/mcp.json`, MCP 등록 키는 `kakao-max`입니다.
+패키지명은 `kakao-mcp-ccomajeon`, 기본 실행 명령은 `kakao-mcp`입니다. 개인 패키지명과 같은 `kakao-mcp-ccomajeon` 명령도 사용할 수 있습니다. 서버 데이터 경로는 `/var/lib/kakao-mcp`, 서비스는 `kakao-mcp.service`, 클라이언트 설정 경로는 `~/.config/kakao-mcp/mcp.json`, MCP 등록 키는 `kakao-mcp`입니다.
+
+이번 버전은 서비스·설정·데이터의 기본 이름을 변경합니다. 이미 설치한 서버는 기존 서비스를 그대로 둔 채 새 설치를 실행하지 마세요. 데이터 경로와 서비스 계정을 확인한 뒤 운영자가 이전해야 하며, 이 패키지는 기존 계정 데이터를 자동 이동하거나 서비스를 자동 중지하지 않습니다.
 
 ### 1. 서버 준비와 설치
 
@@ -92,12 +94,12 @@ flowchart LR
 ```bash
 node --version
 npm --version
-sudo npm install --global --prefix /usr/local ./kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz
-/usr/local/bin/kakao-mcp-ccomajeon --version
-/usr/local/bin/kakao-mcp-ccomajeon setup
+sudo npm install --global --prefix /usr/local ./kakao-mcp-ccomajeon-0.2.0-rebuild.3.tgz
+/usr/local/bin/kakao-mcp --version
+/usr/local/bin/kakao-mcp setup
 ```
 
-버전은 `0.2.0-rebuild.2`이어야 합니다. `setup`은 일반 사용자로 시작하고, 설치 과정에서 필요한 sudo 요청에 응답하세요.
+버전은 `0.2.0-rebuild.3`이어야 합니다. `setup`은 일반 사용자로 시작하고, 설치 과정에서 필요한 sudo 요청에 응답하세요.
 
 마법사에서 다음 순서로 진행합니다.
 
@@ -107,11 +109,11 @@ sudo npm install --global --prefix /usr/local ./kakao-mcp-ccomajeon-0.2.0-rebuil
 4. 자동 재로그인 정보 저장 여부를 선택합니다. 에이전트 모드는 처음에는 기본 **ask**를 유지합니다.
 5. 표시된 설치 내용을 확인하고 서비스 등록·시작을 승인합니다.
 
-설치 경로는 `/var/lib/kakao-max`, 서비스는 `kakao-max.service`입니다. 계정 하나의 연결은 이 서비스 하나가 유지합니다. 설치 후 같은 계정으로 `kakao-mcp-ccomajeon-mcp`를 별도로 실행하지 마세요.
+설치 경로는 `/var/lib/kakao-mcp`, 서비스는 `kakao-mcp.service`입니다. 계정 하나의 연결은 이 서비스 하나가 유지합니다. 설치 후 같은 계정으로 `kakao-mcp-mcp`를 별도로 실행하지 마세요.
 
 ```bash
-systemctl status kakao-max --no-pager
-kakao-mcp-ccomajeon setup --doctor
+systemctl status kakao-mcp --no-pager
+kakao-mcp setup --doctor
 ```
 
 현재 버전의 실제 계정 로그인·송수신은 아직 검증하지 않았습니다. 시스템 설치·로그인 과정에 문제가 생기면 아래 진단 명령으로 확인하세요.
@@ -123,20 +125,20 @@ kakao-mcp-ccomajeon setup --doctor
 **AI가 다른 컴퓨터에서 실행되는 경우:** 그 컴퓨터에도 같은 `.tgz` 파일을 옮겨 설치합니다. 먼저 SSH 키 또는 SSH 에이전트로 서버에 비밀번호 질문 없이 접속할 수 있어야 합니다.
 
 ```bash
-npm install --global ./kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz
-kakao-mcp-ccomajeon setup
+npm install --global ./kakao-mcp-ccomajeon-0.2.0-rebuild.3.tgz
+kakao-mcp setup
 ```
 
-마법사에서 **기존 데몬 연결(1)**을 선택하고 `user@server` 또는 SSH 별칭과 데몬 포트를 입력합니다. 여기서 `user@server`는 실제 SSH 사용자·서버 주소로 바꾸세요. 마법사가 만든 `~/.config/kakao-max/mcp.json`과 출력한 AI별 등록 명령을 사용합니다. 전역 설치 위치에 쓰기 권한이 없다면 시스템 전역 설치 권한을 사용하거나 쓰기 가능한 npm prefix를 설정하세요.
+마법사에서 **기존 데몬 연결(1)**을 선택하고 `user@server` 또는 SSH 별칭과 데몬 포트를 입력합니다. 여기서 `user@server`는 실제 SSH 사용자·서버 주소로 바꾸세요. 마법사가 만든 `~/.config/kakao-mcp/mcp.json`과 출력한 AI별 등록 명령을 사용합니다. 전역 설치 위치에 쓰기 권한이 없다면 시스템 전역 설치 권한을 사용하거나 쓰기 가능한 npm prefix를 설정하세요.
 
 설정 JSON만 필요하면 다음 명령을 사용합니다. `--config`는 JSON을 출력하며, 설정 저장이나 Codex 등록을 자동 수행하지 않습니다.
 
 ```bash
 # 같은 컴퓨터의 데몬
-kakao-mcp-ccomajeon setup --config --listen 127.0.0.1:8787
+kakao-mcp setup --config --listen 127.0.0.1:8787
 
 # 다른 서버의 데몬
-kakao-mcp-ccomajeon setup --config --ssh user@server --listen 127.0.0.1:8787
+kakao-mcp setup --config --ssh user@server --listen 127.0.0.1:8787
 ```
 
 AI 클라이언트 재시작 후 다음과 같이 요청할 수 있습니다.
@@ -154,10 +156,10 @@ AI 클라이언트 재시작 후 다음과 같이 요청할 수 있습니다.
 
 ```bash
 # 같은 컴퓨터에서 실행 중인 데몬 사용
-kakao-mcp-ccomajeon web
+kakao-mcp web
 
 # 서버의 데몬에 SSH로 연결
-kakao-mcp-ccomajeon web --ssh user@server
+kakao-mcp web --ssh user@server
 ```
 
 터미널에 표시된 `http://127.0.0.1:8899/launch?t=...` 링크를 브라우저에서 엽니다. 실행 링크는 매번 바뀌며 로그인 권한을 포함하므로 공유하지 마세요. 데몬 포트가 다르면 `--listen 127.0.0.1:포트`를 추가합니다.
@@ -165,12 +167,12 @@ kakao-mcp-ccomajeon web --ssh user@server
 터미널 명령은 기본적으로 실행한 컴퓨터의 `127.0.0.1:8787` 데몬을 사용합니다. 원격 서버라면 SSH로 서버에 로그인한 후 실행하세요.
 
 ```bash
-kakao-mcp-ccomajeon status                       # 연결 상태
-kakao-mcp-ccomajeon list                         # 대화방 목록
-kakao-mcp-ccomajeon chat                         # 터미널 메신저
-kakao-mcp-ccomajeon history "대화방 이름" 20      # 최근 기록
-kakao-mcp-ccomajeon send self "테스트 메모"       # 나와의 채팅에 실제 전송
-kakao-mcp-ccomajeon help                         # 전체 명령 확인
+kakao-mcp status                       # 연결 상태
+kakao-mcp list                         # 대화방 목록
+kakao-mcp chat                         # 터미널 메신저
+kakao-mcp history "대화방 이름" 20      # 최근 기록
+kakao-mcp send self "테스트 메모"       # 나와의 채팅에 실제 전송
+kakao-mcp help                         # 전체 명령 확인
 ```
 
 일반 방에서 승인 필요 오류가 나면 안내된 승인 절차를 진행합니다. 전송 결과가 불명확하면 새 요청으로 다시 보내지 말고 기존 `requestId`의 상태를 확인하세요.
@@ -201,7 +203,7 @@ kakao-mcp-ccomajeon help                         # 전체 명령 확인
 
 ### 보안 검사 요약 (2026-11-01)
 
-검사 대상은 애플리케이션 소스·격리 테스트·의존성이며 실제 계정과 운영 서버 침투 시험은 포함하지 않았습니다. 확인한 승인 재사용, 방 읽기 상한 우회, 사진 표시 코드 삽입, 링크 미리보기 DNS 재바인딩 문제를 수정한 버전은 **`0.2.0-rebuild.2`**입니다. 이전 `rebuild.1` 대신 수정본을 사용하세요.
+검사 대상은 애플리케이션 소스·격리 테스트·의존성이며 실제 계정과 운영 서버 침투 시험은 포함하지 않았습니다. 확인한 승인 재사용, 방 읽기 상한 우회, 사진 표시 코드 삽입, 링크 미리보기 DNS 재바인딩 문제를 수정한 버전은 **`0.2.0-rebuild.2`**입니다. 현재 배포인 `0.2.0-rebuild.3`에는 이 수정이 포함되어 있습니다.
 
 클라이언트 확인 창은 클라이언트가 사람에게 실제로 물었다는 전제에 의존합니다. AI의 셸/SSH 접근과 사람 승인을 분리해야 한다면 `KAKAO_APPROVAL_CLIENT_CONFIRM=off`와 패스키 승인을 구성하세요. 패스키가 준비되기 전에 끄면 승인이 필요한 작업이 막힙니다. 같은 OS 사용자나 root의 파일 접근까지 막지는 않습니다.
 
@@ -209,7 +211,7 @@ kakao-mcp-ccomajeon help                         # 전체 명령 확인
 
 ### 4. 선택 도구 묶음과 진단
 
-기본 MCP 도구는 16개입니다. 전체 41개 도구를 노출하려면 서버의 `/var/lib/kakao-max/app/.env.local`에 다음 설정을 추가하거나 기존 값을 수정합니다. 파일 소유자와 비공개 권한을 유지하세요.
+기본 MCP 도구는 16개입니다. 전체 41개 도구를 노출하려면 서버의 `/var/lib/kakao-mcp/app/.env.local`에 다음 설정을 추가하거나 기존 값을 수정합니다. 파일 소유자와 비공개 권한을 유지하세요.
 
 ```dotenv
 KAKAO_MCP_TOOL_GROUPS=chats,friends,events,vault
@@ -218,18 +220,18 @@ KAKAO_MCP_TOOL_GROUPS=chats,friends,events,vault
 설정 적용에는 데몬 재시작과 AI 재연결이 필요합니다. 재시작하면 실행 중 일시정지가 해제되므로, 작업 상태를 확인한 뒤 운영자가 실행합니다.
 
 ```bash
-sudo systemctl restart kakao-max
+sudo systemctl restart kakao-mcp
 ```
 
 도구 노출은 방 접근 권한이나 자동 보관 허용을 대신하지 않습니다. 문제가 생기면 다음 명령으로 확인합니다.
 
 ```bash
-kakao-mcp-ccomajeon setup --doctor
-systemctl status kakao-max --no-pager
-sudo journalctl -u kakao-max -n 80 --no-pager
+kakao-mcp setup --doctor
+systemctl status kakao-mcp --no-pager
+sudo journalctl -u kakao-mcp -n 80 --no-pager
 ```
 
-인증 정보 복구가 필요하다는 진단이 나오면 서버에서 `kakao-mcp-ccomajeon setup --repair`를 사용합니다. 비밀번호·인증 코드·토큰은 채팅에 붙여 넣지 말고 해당 터미널이나 휴대폰에서 입력하세요.
+인증 정보 복구가 필요하다는 진단이 나오면 서버에서 `kakao-mcp setup --repair`를 사용합니다. 비밀번호·인증 코드·토큰은 채팅에 붙여 넣지 말고 해당 터미널이나 휴대폰에서 입력하세요.
 
 ## 소스 개발과 패키지 빌드
 
@@ -243,9 +245,9 @@ npm run check:package
 npm pack
 ```
 
-`npm pack`은 현재 디렉터리에 `kakao-mcp-ccomajeon-0.2.0-rebuild.2.tgz`를 만듭니다. 생성된 파일을 서버로 옮긴 후 위 1단계의 패키지 설치 명령을 사용하세요. GitHub에서 소스 ZIP/TAR 파일을 받았다면 먼저 압축을 풀고 같은 npm 명령을 실행합니다. 소스 압축본에는 `.git`이 없고, 관리형 소스 설치는 깨끗한 `origin/main` 체크아웃만 허용하므로 압축본에서 `npm run setup`으로 새 서버를 설치하는 방식은 지원되지 않습니다.
+`npm pack`은 현재 디렉터리에 `kakao-mcp-ccomajeon-0.2.0-rebuild.3.tgz`를 만듭니다. 생성된 파일을 서버로 옮긴 후 위 1단계의 패키지 설치 명령을 사용하세요. GitHub에서 소스 ZIP/TAR 파일을 받았다면 먼저 압축을 풀고 같은 npm 명령을 실행합니다. 소스 압축본에는 `.git`이 없고, 관리형 소스 설치는 깨끗한 `origin/main` 체크아웃만 허용하므로 압축본에서 `npm run setup`으로 새 서버를 설치하는 방식은 지원되지 않습니다.
 
-이미 실행 중인 데몬에 개발용 클라이언트를 연결할 때는 `npm run build --workspace=@kakao-max/protocol` 후 `npm run kakao -- status`, `npm run kakao -- chat`, `npm run web`을 사용할 수 있습니다.
+이미 실행 중인 데몬에 개발용 클라이언트를 연결할 때는 `npm run build --workspace=@kakao-mcp/protocol` 후 `npm run kakao -- status`, `npm run kakao -- chat`, `npm run web`을 사용할 수 있습니다.
 
 ## 검증 상태와 지원 범위
 
@@ -261,4 +263,4 @@ MIT 라이선스입니다. 자세한 내용은 [LICENSE](LICENSE)를 참고하�
 
 Kakao의 공식 제품이 아니며 Kakao와 제휴하거나 승인을 받은 프로젝트가 아닙니다. KakaoTalk 및 관련 상표의 권리는 각 권리자에게 있습니다.
 
-GitHub Actions는 단위·타입·패키지·공개 파일 검사를 실행합니다. `KAKAO_MAX_DENYLIST` 저장소 Secret을 설정하면 비공개 금지어 목록도 검사하며, 미설정 시 공개 패턴만 검사합니다. npm 게시 워크플로는 별도 환경 승인·trusted publishing 구성이 필요하며 소스 업로드만으로 npm에 게시되지 않습니다.
+GitHub Actions는 단위·타입·패키지·공개 파일 검사를 실행합니다. `KAKAO_MCP_DENYLIST` 저장소 Secret을 설정하면 비공개 금지어 목록도 검사하며, 미설정 시 공개 패턴만 검사합니다. npm 게시 워크플로는 별도 환경 승인·trusted publishing 구성이 필요하며 소스 업로드만으로 npm에 게시되지 않습니다.

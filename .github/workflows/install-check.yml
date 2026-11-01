@@ -66,24 +66,24 @@ jobs:
           SOURCE: ${{ matrix.source }}
         run: |
           fail() { echo "install-check: $*" >&2; exit 1; }
-          getent passwd kakao-max >/dev/null || fail "service account missing"
-          sudo test -d /var/lib/kakao-max/data || fail "data directory missing"
-          [ "$(sudo stat -c %U /var/lib/kakao-max/data)" = kakao-max ] || fail "data directory not owned by kakao-max"
-          [ "$(sudo stat -c %a /var/lib/kakao-max/data)" = 700 ] || fail "data directory is not 0700"
-          [ "$(sudo stat -c %U /var/lib/kakao-max/app)" = root ] || fail "app directory not root-owned"
-          state=$(sudo cat /var/lib/kakao-max/install-state.json)
+          getent passwd kakao-mcp >/dev/null || fail "service account missing"
+          sudo test -d /var/lib/kakao-mcp/data || fail "data directory missing"
+          [ "$(sudo stat -c %U /var/lib/kakao-mcp/data)" = kakao-mcp ] || fail "data directory not owned by kakao-mcp"
+          [ "$(sudo stat -c %a /var/lib/kakao-mcp/data)" = 700 ] || fail "data directory is not 0700"
+          [ "$(sudo stat -c %U /var/lib/kakao-mcp/app)" = root ] || fail "app directory not root-owned"
+          state=$(sudo cat /var/lib/kakao-mcp/install-state.json)
           echo "$state" | jq '{version, release, commit, phase, port, digest: (.digest != null), deviceUuid: (.deviceUuid != null)}'
           [ "$(echo "$state" | jq -r .phase)" = prepared ] || fail "unexpected install phase"
           [ "$(echo "$state" | jq -r '.deviceUuid // empty')" = "" ] || fail "a device identity was created"
-          sudo test ! -e /var/lib/kakao-max/app/.env.local || fail "credentials file exists"
-          test ! -e /etc/systemd/system/kakao-max.service || fail "service unit was installed before login"
+          sudo test ! -e /var/lib/kakao-mcp/app/.env.local || fail "credentials file exists"
+          test ! -e /etc/systemd/system/kakao-mcp.service || fail "service unit was installed before login"
           if [ "$SOURCE" = package ]; then
             [ "$(echo "$state" | jq -r .version)" = 2 ] || fail "package install should record state version 2"
-            [ "$(echo "$state" | jq -r .release)" = "$(kakao-max --version)" ] || fail "pinned release differs from the installed package"
-            sudo test -f /var/lib/kakao-max/app/dist/mcp.mjs || fail "daemon bundle missing"
+            [ "$(echo "$state" | jq -r .release)" = "$(kakao-mcp --version)" ] || fail "pinned release differs from the installed package"
+            sudo test -f /var/lib/kakao-mcp/app/dist/mcp.mjs || fail "daemon bundle missing"
           else
             [ "$(echo "$state" | jq -r .version)" = 1 ] || fail "Git install should record state version 1"
             [ "$(echo "$state" | jq -r .commit)" = "$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main)" ] || fail "pinned commit differs from origin/main"
-            sudo test -f /var/lib/kakao-max/app/packages/protocol/dist/index.js || fail "protocol build missing"
+            sudo test -f /var/lib/kakao-mcp/app/packages/protocol/dist/index.js || fail "protocol build missing"
           fi
           echo "install-check: $SOURCE install stopped at the account prompt with no credentials, device or service"

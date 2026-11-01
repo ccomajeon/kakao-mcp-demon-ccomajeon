@@ -1,5 +1,5 @@
-import type { ConversationMessage, ConversationRoom } from '@kakao-max/client';
-import { ConversationError } from '@kakao-max/client';
+import type { ConversationMessage, ConversationRoom } from '@kakao-mcp/client';
+import { ConversationError } from '@kakao-mcp/client';
 import { terminalText as shellText, type DisplayOptions } from './terminal-text.ts';
 
 /** Display aliases are local to the view; they never change account rooms or agent permissions. */

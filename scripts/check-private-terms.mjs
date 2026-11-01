@@ -14,12 +14,12 @@ const PUBLIC = [
   ['email address', /(?<![\w.+-])[\w.+-]+@(?!(?:example\.(?:com|org|net)|[\w-]+\.(?:test|example|invalid)|users\.noreply\.github\.com)\b)[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/i],
 ];
 
-/** Maintainer terms: the KAKAO_MAX_DENYLIST text, or a file from KAKAO_MAX_DENYLIST_FILE or `git config kakao-max.denylist`. */
+/** Maintainer terms: the KAKAO_MCP_DENYLIST text, or a file from KAKAO_MCP_DENYLIST_FILE or `git config kakao-mcp.denylist`. */
 function privatePatterns() {
-  let text = process.env.KAKAO_MAX_DENYLIST;
+  let text = process.env.KAKAO_MCP_DENYLIST;
   if (!text) {
-    let file = process.env.KAKAO_MAX_DENYLIST_FILE;
-    if (!file) try { file = git('config', '--get', '--path', 'kakao-max.denylist').trim(); } catch { /* not configured */ }
+    let file = process.env.KAKAO_MCP_DENYLIST_FILE;
+    if (!file) try { file = git('config', '--get', '--path', 'kakao-mcp.denylist').trim(); } catch { /* not configured */ }
     if (file && existsSync(file)) text = readFileSync(file, 'utf8');
   }
   if (!text) return undefined;

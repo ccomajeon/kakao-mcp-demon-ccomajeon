@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 import { findChatCandidates, registerChatDiscoveryTools } from './tools/chat-discovery.ts';
 
 test('find_chat identifies rooms by participants/count without reading contents or creating rooms', async () => {

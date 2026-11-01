@@ -32,7 +32,7 @@ export function createLaunchSecret(): string {
 
 /** Cookie name; includes the port so two GUIs on different ports keep separate sessions. */
 export function sessionCookieName(port: number): string {
-  return `kakao_max_web_${port}`;
+  return `kakao_mcp_web_${port}`;
 }
 
 /** Set-Cookie value for the launch secret. Browser-only, never sent cross-site. */

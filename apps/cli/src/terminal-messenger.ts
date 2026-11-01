@@ -1,6 +1,6 @@
 import { emitKeypressEvents, type Key } from 'node:readline';
 import { terminalText as shellText, type DisplayOptions } from './terminal-text.ts';
-import { Conversation, McpConversationReader, type ConversationReader, type WriteResult, type MessageWriter } from '@kakao-max/client';
+import { Conversation, McpConversationReader, type ConversationReader, type WriteResult, type MessageWriter } from '@kakao-mcp/client';
 import { ConversationView } from './conversation-view.ts';
 import { conversationError } from './conversation-errors.ts';
 import { sendMessage } from './agent-send-client.ts';
@@ -226,7 +226,7 @@ export class TerminalMessenger {
     if (width < 70 || height < 14) return '\x1b[H\x1b[2J' + fit('터미널을 넓혀 주세요 (72칸 × 14줄 이상). Ctrl+C 종료', width);
     const lines: string[] = [];
     const add = (s: string) => lines.push(fit(s, width));
-    add(`kakao-max  |  터미널 메신저 · 모드: ${this.conversation.mode ?? '확인 중'} · 읽음 표시 안 보냄` + (this.options.demo ? '  ·  촬영 모드' : ''));
+    add(`kakao-mcp  |  터미널 메신저 · 모드: ${this.conversation.mode ?? '확인 중'} · 읽음 표시 안 보냄` + (this.options.demo ? '  ·  촬영 모드' : ''));
     const statusLines = wrap(this.busy ? '처리 중…  ·  작성 중인 내용은 유지됩니다.' : this.status, width).slice(0, height - 10);
     for (const line of statusLines) add(line);
     add('─'.repeat(width));

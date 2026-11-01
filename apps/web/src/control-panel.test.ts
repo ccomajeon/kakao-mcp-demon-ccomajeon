@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, loadConfig } from '@kakao-max/core';
+import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, loadConfig } from '@kakao-mcp/core';
 import { McpStdioServer } from '../../mcp/src/mcp-stdio.ts';
 import { ElicitationApprovals } from '../../mcp/src/client-approval.ts';
 import { agentControlAdapter, grantViews, registerPermissionTools } from '../../mcp/src/tools/agent-operations.ts';
@@ -18,7 +18,7 @@ const ROOM = '700000001', OTHER = '700000002';
 const RESUME = '00000000-0000-4000-8000-0000000000a1';
 
 async function daemon(t: { after(fn: () => unknown): void }) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kakao-max-web-control-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kakao-mcp-web-control-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const db = KakaoDb.open({ dir: root }), journal = AgentSendJournal.open(root), rooms = new RoomAccessPolicy(db);
   const approvals = new ApprovalStore(journal, new ApproverRegistry(root), Date.now, { clientConfirmations: true });

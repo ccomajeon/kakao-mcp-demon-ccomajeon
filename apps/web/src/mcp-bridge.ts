@@ -3,7 +3,7 @@ import readline from 'node:readline';
 import { EventEmitter } from 'node:events';
 import type { Duplex } from 'node:stream';
 
-/** A kakao-max tool error; APPROVAL_REQUIRED carries the passkey page link when the daemon has one. */
+/** A kakao-mcp tool error; APPROVAL_REQUIRED carries the passkey page link when the daemon has one. */
 export class McpToolError extends Error {
   readonly code?: string;
   readonly approvalUrl?: string;
@@ -159,7 +159,7 @@ export class McpBridge extends EventEmitter {
         const initTimer = setTimeout(() => s.destroy(new Error(`MCP initialize timed out after ${this.initTimeoutMs}ms`)), this.initTimeoutMs);
         try {
           // Declaring form elicitation lets the daemon ask the person through this GUI instead of refusing.
-          await this.call('initialize', { protocolVersion: '2025-11-25', capabilities: { elicitation: { form: {} } }, clientInfo: { name: 'kakao-max-web', version: '0.1.0' } });
+          await this.call('initialize', { protocolVersion: '2025-11-25', capabilities: { elicitation: { form: {} } }, clientInfo: { name: 'kakao-mcp-web', version: '0.1.0' } });
           clearTimeout(initTimer);
           this._connected = true;
           this.emit('connected');
@@ -393,7 +393,7 @@ export class McpBridge extends EventEmitter {
     return this.callTool('mark_read', { requestId, chatId, watermark });
   }
 
-  /** kakao-max searches one room at a time (read_messages search mode). */
+  /** kakao-mcp searches one room at a time (read_messages search mode). */
   async searchMessages(query: string, opts: { chatId: string; limit?: number }): Promise<{ count: number; messages: any[] }> {
     return this.callTool('read_messages', { chatId: opts.chatId, mode: 'search', query, ...(opts.limit ? { limit: opts.limit } : {}) });
   }

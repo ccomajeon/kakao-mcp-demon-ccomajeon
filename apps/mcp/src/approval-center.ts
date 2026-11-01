@@ -2,7 +2,7 @@
 // notification to the configured destination. Drafts live only here (RAM), never on disk; a restart
 // drops them and the operator prepares again.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { KakaoError, RECIPIENT_ACTIONS, type ApprovalStore, type ApprovalEvent, type RecipientPermissions, type WebAuthnAssertion } from '@kakao-max/core';
+import { KakaoError, RECIPIENT_ACTIONS, type ApprovalStore, type ApprovalEvent, type RecipientPermissions, type WebAuthnAssertion } from '@kakao-mcp/core';
 
 export interface PendingApproval {
   requestId: string; code: string; action: string; expiresAt: number; signingText: string;
@@ -85,7 +85,7 @@ export class ApprovalCenter {
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
     const batch = this.queued.splice(0);
     if (!batch.length || !this.deps.notify) return;
-    const text = [`[kakao-max] 승인 요청 ${batch.length}건`, ...batch.map(b => `#${b.code} ${b.url}`)].join('\n');
+    const text = [`[kakao-mcp] 승인 요청 ${batch.length}건`, ...batch.map(b => `#${b.code} ${b.url}`)].join('\n');
     try { await this.deps.notify(text); }
     catch (error) { (this.deps.log ?? (l => process.stderr.write(l + '\n')))(`[approval] notification failed: ${error instanceof KakaoError ? error.code : 'error'}`); }
   }

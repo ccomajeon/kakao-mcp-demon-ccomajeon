@@ -4,12 +4,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 
 export interface Release { dir: string; version: string; digest: string }
 
 const RELEASE_ENTRIES = ['package.json', 'LICENSE', 'dist'];
-const PACKAGE_NAME = 'kakao-max';
+const PACKAGE_NAME = 'kakao-mcp';
 export const RELEASE_DIGEST = /^[a-f0-9]{64}$/;
 export const RELEASE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
@@ -35,11 +35,11 @@ export function releaseDigest(dir: string): string {
   return hash.digest('hex');
 }
 
-/** The package this program runs from. Only the published kakao-max package is installed as a service. */
+/** The package this program runs from. Only the published kakao-mcp package is installed as a service. */
 export function readRelease(dir: string): Release {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
   if (manifest.name !== PACKAGE_NAME || typeof manifest.version !== 'string' || !RELEASE_VERSION.test(manifest.version)) {
-    throw new KakaoError('CONFIG_INVALID', 'This program is not running from a kakao-max package');
+    throw new KakaoError('CONFIG_INVALID', 'This program is not running from a kakao-mcp package');
   }
   return { dir, version: manifest.version, digest: releaseDigest(dir) };
 }

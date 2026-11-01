@@ -1,5 +1,5 @@
 import { prepareAndCommit, REQUEST_ID } from './one-call.ts';
-import { canonicalAgentJson, KakaoError, type KakaoSession, type AgentMessage, type AgentSendAdapter, type AgentSendService } from '@kakao-max/core';
+import { canonicalAgentJson, KakaoError, type KakaoSession, type AgentMessage, type AgentSendAdapter, type AgentSendService } from '@kakao-mcp/core';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 
 /** Platform adapter: existing session only, with no content read or read-receipt call. */

@@ -1,6 +1,6 @@
 import { prepareAndCommit, REQUEST_ID } from './one-call.ts';
 import { KakaoError, type KakaoSession, type SendPolicy, type AgentPublicationAdapter, type AgentPublicationService,
-  type AgentPublicationAction, type AgentPublicationInput } from '@kakao-max/core';
+  type AgentPublicationAction, type AgentPublicationInput } from '@kakao-mcp/core';
 import { agentMessageAdapter } from './agent-messages.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

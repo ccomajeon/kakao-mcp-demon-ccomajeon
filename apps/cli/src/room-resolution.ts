@@ -1,4 +1,4 @@
-import { KakaoError } from '@kakao-max/core';
+import { KakaoError } from '@kakao-mcp/core';
 
 /** Resolve only already-known rooms. Lookup never creates a room or contacts a server. */
 export function resolveRoom<T extends { id: string; type?: string; title?: string }>(chats: T[], query: string): T | undefined {

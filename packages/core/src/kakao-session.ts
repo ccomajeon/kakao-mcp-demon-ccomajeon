@@ -30,7 +30,7 @@ import {
   parseEmoticonAttachment,
   type EmoticonAttachment,
   parseLoginList
-} from '@kakao-max/protocol';
+} from '@kakao-mcp/protocol';
 
 /** The logId a delete notice (type 0 feed, feedType 14) points at, or undefined. */
 function deletedLogIdOf(notice: IncomingMessage | undefined): string | undefined {

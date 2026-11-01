@@ -41,26 +41,26 @@ try {
   const bin = name => path.join(prefix, 'node_modules', '.bin', win ? `${name}.cmd` : name);
   for (const name of ['kakao-mcp-ccomajeon', 'kakao-mcp-ccomajeon-mcp', 'kakao-mcp-ccomajeon-web']) check(fs.existsSync(bin(name)), `command ${name} is linked`);
 
-  for (const name of ['kakao-max', 'kakao-max-mcp', 'kakao-max-web']) check(fs.existsSync(bin(name)), `compatibility command ${name} is linked`);
+  for (const name of ['kakao-mcp', 'kakao-mcp-mcp', 'kakao-mcp-web']) check(fs.existsSync(bin(name)), `short command ${name} is linked`);
 
-  const help = run(bin('kakao-mcp-ccomajeon'), ['help']);
-  check(help.status === 0 && help.stdout.includes('kakao-mcp-ccomajeon setup'), 'kakao-mcp-ccomajeon help runs');
-  const version = run(bin('kakao-mcp-ccomajeon'), ['--version']);
+  const help = run(bin('kakao-mcp'), ['help']);
+  check(help.status === 0 && help.stdout.includes('kakao-mcp setup'), 'kakao-mcp-ccomajeon help runs');
+  const version = run(bin('kakao-mcp'), ['--version']);
   check(version.status === 0 && version.stdout.trim() === info.version, `kakao-mcp-ccomajeon --version prints ${info.version}`);
 
-  const config = run(bin('kakao-mcp-ccomajeon'), ['setup', '--config', '--listen', '127.0.0.1:8787']);
+  const config = run(bin('kakao-mcp'), ['setup', '--config', '--listen', '127.0.0.1:8787']);
   let args = [];
-  try { args = JSON.parse(config.stdout).mcpServers['kakao-max'].args; } catch { /* reported below */ }
+  try { args = JSON.parse(config.stdout).mcpServers['kakao-mcp'].args; } catch { /* reported below */ }
   check(config.status === 0 && args[0] === path.join(fs.realpathSync(pkg), 'dist', 'connect.mjs') && fs.existsSync(args[0]) && !args.includes('--experimental-strip-types'),
     'kakao-mcp-ccomajeon setup --config points the AI client at the installed connector');
 
   // Without a registered device the daemon stops before opening any session.
   const daemon = run(bin('kakao-mcp-ccomajeon-mcp'), [], { env: { ...env, KAKAO_MCP_LISTEN: '0.0.0.0:8787' }, timeout: 30_000 });
-  check(daemon.status !== 0 && daemon.stderr.includes('Run kakao-mcp-ccomajeon setup to register this device') && !/SyntaxError|Cannot find|ERR_MODULE/.test(daemon.stderr),
+  check(daemon.status !== 0 && daemon.stderr.includes('Run kakao-mcp setup to register this device') && !/SyntaxError|Cannot find|ERR_MODULE/.test(daemon.stderr),
     'kakao-mcp-ccomajeon-mcp loads and stops without a registered device');
 
-  const doctor = run(bin('kakao-mcp-ccomajeon'), ['setup', '--doctor', '--listen', '127.0.0.1:9']);
-  check(doctor.status === 1 && doctor.stdout.includes('kakao-mcp-ccomajeon setup --repair'), 'kakao-mcp-ccomajeon setup --doctor reports an unreachable daemon with package commands');
+  const doctor = run(bin('kakao-mcp'), ['setup', '--doctor', '--listen', '127.0.0.1:9']);
+  check(doctor.status === 1 && doctor.stdout.includes('kakao-mcp setup --repair'), 'kakao-mcp-ccomajeon setup --doctor reports an unreachable daemon with package commands');
 
   const web = await new Promise(resolve => {
     // Started with node directly so that stopping it stops the server, not only a Windows shell around it.

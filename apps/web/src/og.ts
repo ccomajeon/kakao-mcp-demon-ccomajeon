@@ -156,7 +156,7 @@ export async function fetchOg(rawUrl: string, deps: OgDeps = {}): Promise<OgPrev
         redirect: 'manual',
         headers: {
           // some sites gate OG tags on a browser-ish UA
-          'User-Agent': 'Mozilla/5.0 (compatible; kakao-max-web-preview/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; kakao-mcp-web-preview/1.0)',
           'Accept-Encoding': 'identity',
           Accept: 'text/html,application/xhtml+xml'
         }

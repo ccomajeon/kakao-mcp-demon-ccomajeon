@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ----------------------------------------------------------------------------
-// kakao-max MCP server: assembles the tools over one live KakaoTalk session.
+// kakao-mcp MCP server: assembles the tools over one live KakaoTalk session.
 //
 // Transport: stdio (newline-delimited JSON-RPC 2.0), or a local socket when KAKAO_MCP_LISTEN is set.
 //   { "command": "node", "args": ["--experimental-strip-types", "apps/mcp/src/index.ts"] }
@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { McpStdioServer } from './mcp-stdio.ts';
-import { KakaoSession, SendPolicy, AgentSendService, AgentPublicationService, AgentMutationService, AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions, DailyActionLimit, approvalWindowFromConfig, loadConfig, loadPolicyConfig, KakaoError, toKakaoError, agentModeApproves, MCP_TOOL_GROUPS, SETTLE_GRACE_MS } from '@kakao-max/core';
+import { KakaoSession, SendPolicy, AgentSendService, AgentPublicationService, AgentMutationService, AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions, DailyActionLimit, approvalWindowFromConfig, loadConfig, loadPolicyConfig, KakaoError, toKakaoError, agentModeApproves, MCP_TOOL_GROUPS, SETTLE_GRACE_MS } from '@kakao-mcp/core';
 import { serveSocket, parseListenSpec, validateListenSpec } from './socket-transport.ts';
 import { allowedUids } from './peer-user.ts';
 import { registerMessageInboxTools } from './tools/message-inbox.ts';
@@ -35,7 +35,7 @@ const groups = kakao.config.mcpToolGroups;
 // Optional modules are loaded only when their package is installed.
 const optionalModules = await loadOptionalModules(kakao);
 checkToolGroups(groups, MCP_TOOL_GROUPS, optionalModules);
-const server = new McpStdioServer({ name: 'kakao-max', version: '0.1.0', instructions: serverInstructions(kakao.config.agentMode), toolGroups: groups });
+const server = new McpStdioServer({ name: 'kakao-mcp', version: '0.1.0', instructions: serverInstructions(kakao.config.agentMode), toolGroups: groups });
 const policy = new SendPolicy(loadPolicyConfig());
 let agentSendService: AgentSendService | undefined;
 let agentPublicationService: AgentPublicationService | undefined;

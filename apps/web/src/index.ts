@@ -15,7 +15,7 @@ import { packagedEntry } from '../../../packages/core/src/entry.ts';
 import { localRequestProblem, createLaunchSecret, hasSession, matchesSecret, sessionCookie } from './http-security.ts';
 
 // ----------------------------------------------------------------------------
-// Local, single-account web GUI: a client of the running kakao-max daemon's MCP
+// Local, single-account web GUI: a client of the running kakao-mcp daemon's MCP
 // tools (loopback TCP, MCP_HOST/MCP_PORT), exposed to a browser over REST +
 // Server-Sent Events. Binds to 127.0.0.1 only and never reads account settings
 // or credentials; everything goes through the daemon's policy and approvals.
@@ -338,7 +338,7 @@ const server = http.createServer(async (req, res) => {
   if (!hasSession(req.headers, port, LAUNCH_SECRET)) {
     if (p.startsWith('/api/')) return sendJson(res, 401, { error: 'Open the launch link printed in the terminal that started the GUI' });
     res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end('kakao-max web: open the launch link printed in the terminal that started the GUI.\n');
+    return res.end('kakao-mcp web: open the launch link printed in the terminal that started the GUI.\n');
   }
   try {
     if (p === '/api/control' || p.startsWith('/api/control/')) {
@@ -503,7 +503,7 @@ const server = http.createServer(async (req, res) => {
       const chatId = url.searchParams.get('chatId');
       const limit = Number(url.searchParams.get('limit')) || 20;
       if (!q) return sendJson(res, 200, { count: 0, messages: [] });
-      if (!chatId) return sendJson(res, 400, { error: 'chatId required: kakao-max searches one room at a time' });
+      if (!chatId) return sendJson(res, 400, { error: 'chatId required: kakao-mcp searches one room at a time' });
       if (bridge.isConnected) {
         try {
           const r = await bridge.searchMessages(q, { chatId, limit });

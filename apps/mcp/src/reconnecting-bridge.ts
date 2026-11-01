@@ -35,7 +35,7 @@ export function reconnectingBridge(input: Readable, output: Writable, dial: () =
           'Daemon is reconnecting. This request was not sent. Wait, then retry using the same requestId if applicable.',
           recovery: { action: sent && hasOperation ? 'inspect_existing_operation' : 'wait_for_connection', automaticReplay: false } };
         const modern = !initialize && (r.params?._meta as Record<string, unknown> | undefined)?.['io.modelcontextprotocol/protocolVersion'] === '2026-07-28';
-        write({ jsonrpc: '2.0', id: r.id, result: { ...(modern ? { resultType: 'complete', _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'kakao-max-connector', version: '1' } } } : {}), isError: true, structuredContent: { error }, content: [{ type: 'text', text: error.message }] } });
+        write({ jsonrpc: '2.0', id: r.id, result: { ...(modern ? { resultType: 'complete', _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'kakao-mcp-connector', version: '1' } } } : {}), isError: true, structuredContent: { error }, content: [{ type: 'text', text: error.message }] } });
       } else write({ jsonrpc: '2.0', id: r.id, error: { code: -32000, message: 'Daemon reconnecting; request was not replayed' } });
     };
     const disconnected = (current: Duplex) => {

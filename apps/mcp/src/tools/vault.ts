@@ -1,4 +1,4 @@
-import { KakaoError, type KakaoSession } from '@kakao-max/core';
+import { KakaoError, type KakaoSession } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import { readGrant } from '../read-grant.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';

@@ -15,7 +15,7 @@ export interface DaemonEndpoint {
   ssh?: string;
 }
 
-export const WEB_USAGE = 'Usage: kakao-max-web [--ssh <host-alias|user@host>] [--listen <[host:]port>]';
+export const WEB_USAGE = 'Usage: kakao-mcp-web [--ssh <host-alias|user@host>] [--listen <[host:]port>]';
 
 /** Same rule as setup's --ssh: a host alias or user@host, no flags or shell metacharacters. */
 const SSH_TARGET = /^(?:[a-zA-Z0-9_][a-zA-Z0-9_.-]*@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;

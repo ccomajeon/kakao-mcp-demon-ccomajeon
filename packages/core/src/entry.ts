@@ -1,11 +1,11 @@
 // Which program is running and how to start the others: a source checkout (`node --experimental-strip-types
 // <file>.ts`) or one bundle of the published package (`dist/<name>.mjs`). The package build defines
-// __KAKAO_MAX_ENTRY__ per bundle; a bundle holds several modules that share one import.meta.url, so a URL
+// __KAKAO_MCP_ENTRY__ per bundle; a bundle holds several modules that share one import.meta.url, so a URL
 // comparison alone would start every program in it.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-declare const __KAKAO_MAX_ENTRY__: string | undefined;
+declare const __KAKAO_MCP_ENTRY__: string | undefined;
 
 /** Programs a source checkout runs from TypeScript and the package ships as `dist/<name>.mjs`. */
 export const PROGRAM_SOURCES = {
@@ -24,7 +24,7 @@ export type ProgramName = keyof typeof PROGRAM_SOURCES;
 
 /** The bundle name in the published package, or undefined in a source checkout. */
 export function packagedEntry(): string | undefined {
-  return typeof __KAKAO_MAX_ENTRY__ === 'string' ? __KAKAO_MAX_ENTRY__ : undefined;
+  return typeof __KAKAO_MCP_ENTRY__ === 'string' ? __KAKAO_MCP_ENTRY__ : undefined;
 }
 
 /** True when this module's program was started directly (not imported by a test or another program). */
@@ -48,8 +48,8 @@ export function programArgs(name: ProgramName, opts: { root?: string; packaged?:
   return packaged ? [target] : ['--experimental-strip-types', target];
 }
 
-/** How a person runs the setup wizard here, for messages: `kakao-mcp-ccomajeon setup` from the package, npm in a checkout. */
+/** How a person runs the setup wizard here, for messages: `kakao-mcp setup` from the package, npm in a checkout. */
 export function setupCommand(args = ''): string {
-  if (packagedEntry() !== undefined) return args ? `kakao-mcp-ccomajeon setup ${args}` : 'kakao-mcp-ccomajeon setup';
+  if (packagedEntry() !== undefined) return args ? `kakao-mcp setup ${args}` : 'kakao-mcp setup';
   return args ? `npm run setup -- ${args}` : 'npm run setup';
 }

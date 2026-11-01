@@ -4,8 +4,8 @@ import net from 'node:net';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { registerMessageResources } from './message-resources.ts';
 import { McpClient } from '../../cli/src/mcp-client.ts';
-import { McpConversationReader, Conversation } from '@kakao-max/client';
-import { KakaoError } from '@kakao-max/core';
+import { McpConversationReader, Conversation } from '@kakao-mcp/client';
+import { KakaoError } from '@kakao-mcp/core';
 
 const URI = 'kakao://rooms/2/messages';
 const settle = () => new Promise(resolve => setTimeout(resolve, 15));

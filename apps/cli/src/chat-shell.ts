@@ -44,7 +44,7 @@ export class ChatShell {
     if (!status.connected) throw new ShellInputError('데몬의 카카오톡 연결이 끊겨 있습니다.');
     this.userId = status.userId;
     await this.refresh();
-    this.write('kakao-max shell · ' + (this.options.demo ? '촬영 모드' : '대화형 모드'));
+    this.write('kakao-mcp shell · ' + (this.options.demo ? '촬영 모드' : '대화형 모드'));
     if (this.options.demo) this.write('다른 방 이름·발신자는 가명으로 표시합니다. 공개 방의 메시지 본문은 그대로 표시됩니다.');
     this.write('ls -al → cd <방 이름> (Tab 자동완성) → 메시지 입력 후 Enter');
     this.write('방 안의 일반 입력은 전송됩니다. 명령은 /help로 확인하세요. 읽음 표시는 보내지 않습니다.');

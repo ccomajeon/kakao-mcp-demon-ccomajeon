@@ -5,7 +5,7 @@
 // the same arguments, so the agent-chosen requestId must be stable; a server-generated ID would change on
 // retry and never match the recorded approval. Other clients get the passkey link (when enabled) in the
 // error and call the same tool again with the same requestId after the person approves.
-import { KakaoError, toKakaoError } from '@kakao-max/core';
+import { KakaoError, toKakaoError } from '@kakao-mcp/core';
 import { withApproval } from '../approval-center.ts';
 
 export const REQUEST_ID = { type: 'string', description: 'Stable UUID you choose for this exact operation. Call again with the same requestId and arguments to continue after approval; never replace it after an uncertain outcome.' } as const;

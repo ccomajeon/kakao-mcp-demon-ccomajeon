@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadConfig, toKakaoError, programArgs, installRoot, packagedEntry } from '@kakao-max/core';
+import { loadConfig, toKakaoError, programArgs, installRoot, packagedEntry } from '@kakao-mcp/core';
 import { resolveRoom } from './room-resolution.ts';
 import { randomUUID } from 'node:crypto';
 import { sendMessage, sendPhotos, submitWrite, approvalLink } from './agent-send-client.ts';
@@ -77,7 +77,7 @@ async function getBackend(): Promise<KakaoBackend> {
   } catch (e) {
     console.error(`\n${c.red}${c.bold}❌ 카카오톡 MCP 데몬(${MCP_HOST}:${MCP_PORT})에 연결할 수 없습니다.${c.reset} ${c.dim}${(e as Error).message}${c.reset}`);
     console.error(`${c.gray}데몬을 실행하거나 터널을 여세요:${c.reset}`);
-    console.error(`  • 로컬 데몬:  ${c.cyan}KAKAO_MCP_LISTEN=127.0.0.1:8787 npm run start --workspace=@kakao-max/mcp${c.reset}`);
+    console.error(`  • 로컬 데몬:  ${c.cyan}KAKAO_MCP_LISTEN=127.0.0.1:8787 npm run start --workspace=@kakao-mcp/mcp${c.reset}`);
     console.error(`  • 원격 터널:  ${c.cyan}ssh -N -L 8787:127.0.0.1:8787 <서버>${c.reset}\n`);
     process.exit(1);
   }
@@ -412,7 +412,7 @@ async function cmdSearch(query: string, targetArg?: string, readGrantId?: string
 // every check asserts on real data and the process exits non-zero on any failure.
 async function cmdTest(groupOnly = false, chatId?: string) {
   class SmokeAssertionError extends Error {}
-  console.log(`\n${c.bold}🧪 kakao-max 스모크 테스트 (읽기 전용, MCP 데몬 직접 연결)${c.reset}\n`);
+  console.log(`\n${c.bold}🧪 kakao-mcp 스모크 테스트 (읽기 전용, MCP 데몬 직접 연결)${c.reset}\n`);
   const backend = await getBackend();
   const readRoom = readRoomSmokeAccess(backend);
   let failed = 0;
@@ -525,7 +525,7 @@ async function cmdTest(groupOnly = false, chatId?: string) {
 }
 
 function cmdHelp() {
-  const command = packagedEntry() ? 'kakao-mcp-ccomajeon' : 'npm run kakao --';
+  const command = packagedEntry() ? 'kakao-mcp' : 'npm run kakao --';
   console.log(`
 ${c.bold}KakaoTalk Native Terminal CLI${c.reset}
 카카오톡을 리눅스/macOS 터미널에서 제어하는 커맨드라인 도구입니다.

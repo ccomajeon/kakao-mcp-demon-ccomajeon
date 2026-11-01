@@ -14,7 +14,7 @@ node tools/elicitation-fixture/smoke.mjs "$(which node)" "$PWD/tools/elicitation
 ```
 
 새 방식 클라이언트를 흉내 내어 discover → prepare → send(확인 창 요청) → Enter만(다시 묻기) →
-코드+묻지 않기(전송) → 두 번째 전송(확인 창 없음)까지 출력합니다. 먼저 `npm run build --workspace=@kakao-max/protocol`.
+코드+묻지 않기(전송) → 두 번째 전송(확인 창 없음)까지 출력합니다. 먼저 `npm run build --workspace=@kakao-mcp/protocol`.
 
 ## 실제 Claude Code로 시험
 

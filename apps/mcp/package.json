@@ -1,10 +1,10 @@
 {
-  "name": "@kakao-max/mcp",
+  "name": "@kakao-mcp/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "kakao-max-mcp": "src/index.ts"
+    "kakao-mcp-mcp": "src/index.ts"
   },
   "scripts": {
     "start": "node --experimental-strip-types src/index.ts",
@@ -15,7 +15,7 @@
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "dependencies": {
-    "@kakao-max/core": "*",
-    "@kakao-max/protocol": "*"
+    "@kakao-mcp/core": "*",
+    "@kakao-mcp/protocol": "*"
   }
 }

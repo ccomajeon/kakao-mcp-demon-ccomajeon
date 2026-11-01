@@ -1,7 +1,7 @@
 // Human-only repair UI, invoked under the managed deployment lock. No auth call.
 import fs from 'node:fs';
 import path from 'node:path';
-import { CredentialStore, KakaoError } from '@kakao-max/core';
+import { CredentialStore, KakaoError } from '@kakao-mcp/core';
 import { parseEnv } from '../../../packages/core/src/env-file.ts';
 import { confirmSetup, type SetupPrompt } from './setup-prompts.ts';
 

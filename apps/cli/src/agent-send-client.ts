@@ -1,7 +1,7 @@
 // Client orchestration only; authorization and durable attempts remain in core.
 import { McpToolError } from './mcp-client.ts';
 import { randomUUID } from 'node:crypto';
-import { KakaoError, type AgentMessage, type AgentPublicationInput } from '@kakao-max/core';
+import { KakaoError, type AgentMessage, type AgentPublicationInput } from '@kakao-mcp/core';
 export interface AgentToolClient { callTool<T = any>(name: string, args: Record<string, unknown>): Promise<T>; }
 
 /** Errors that prove the daemon made no external attempt; everything else may follow a side effect. */

@@ -1,6 +1,6 @@
 # Agent instructions
 
-kakao-max is a headless account daemon. `packages/protocol` implements LOCO,
+kakao-mcp is a headless account daemon. `packages/protocol` implements LOCO,
 `packages/core` owns the single account session, stores, permissions and write engine,
 `apps/mcp` exposes tools and approvals, and `apps/cli` and `apps/web` (a local, loopback-only
 browser GUI) connect to the daemon as MCP clients; neither opens an account session or reads credentials.

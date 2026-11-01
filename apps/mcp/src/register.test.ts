@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { generateDeviceUuid } from '@kakao-max/protocol';
+import { generateDeviceUuid } from '@kakao-mcp/protocol';
 import { persistRegistration, describeResult, DEFAULT_DEVICE_NAME } from './register.ts';
 
 function tmpEnv(contents = ''): string {

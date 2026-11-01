@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, loadConfig, type ReadApproval } from '@kakao-max/core';
+import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, loadConfig, type ReadApproval } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { ElicitationApprovals } from './client-approval.ts';
 import { agentControlAdapter, grantViews } from './tools/agent-operations.ts';

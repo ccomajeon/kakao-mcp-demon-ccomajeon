@@ -16,7 +16,7 @@ flowchart LR
   P --> K[Existing KakaoSession and stores]
 ```
 
-`@kakao-max/client` owns UI contracts, the ordinary MCP reader adapter and the
+`@kakao-mcp/client` owns UI contracts, the ordinary MCP reader adapter and the
 Conversation model. The terminal owns input, layout and aliases. Core remains the
 only account implementation. No client creates another account session or reads
 account credentials.

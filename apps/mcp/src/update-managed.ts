@@ -4,7 +4,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { KakaoError, parseAllowedUids, removedSettingsIn, isMainModule, installRoot, packagedEntry } from '@kakao-max/core';
+import { KakaoError, parseAllowedUids, removedSettingsIn, isMainModule, installRoot, packagedEntry } from '@kakao-mcp/core';
 import { parseEnv } from '../../../packages/core/src/env-file.ts';
 import { configureManagedLogin, readManagedEnv } from './managed-login.ts';
 import { terminalPrompt } from './setup-prompts.ts';
@@ -12,7 +12,7 @@ import { serviceUnit, legacyServiceUnit, installPort, protectedRelease } from '.
 import { installRelease, releaseDigest, releaseLabel, RELEASE_DIGEST, RELEASE_VERSION, type Release } from './release.ts';
 import { probe } from './healthcheck.ts';
 
-const DEFAULT_SERVICE = 'kakao-max';
+const DEFAULT_SERVICE = 'kakao-mcp';
 const LEGACY_SERVICE = 'kakaotalk-mcp';
 const LEGACY_ROOT = '/var/lib/kakaotalk-mcp';
 const LEGACY_UNIT = '/etc/systemd/system/kakaotalk-mcp.service';
@@ -94,7 +94,7 @@ export async function updateManaged(h: UpdateHost): Promise<void> {
     const port = installPort(String(state.port));
     if (pkg ? state.version === 1 : state.version === 2) {
       throw new KakaoError('CONFIG_INVALID', pkg ? 'This installation was set up from a source checkout; update it from that checkout. Nothing was stopped'
-        : 'This installation was set up from the kakao-max package; update it with kakao-max setup --update. Nothing was stopped');
+        : 'This installation was set up from the kakao-mcp package; update it with kakao-mcp setup --update. Nothing was stopped');
     }
     const validPin = pkg ? RELEASE_VERSION.test(state.release) && RELEASE_DIGEST.test(state.digest) : /^[a-f0-9]{40}$/.test(state.commit);
     // An update records the pin it is installing before it touches the app; the marker stays while the result is unconfirmed.
@@ -102,9 +102,9 @@ export async function updateManaged(h: UpdateHost): Promise<void> {
     if (state.pendingUpdate !== undefined && !pending) throw new KakaoError('CONFIG_INVALID', 'Invalid pending update in the install manifest; nothing was stopped');
     const base = { ...state }; delete base.pendingUpdate;
     // The commands that actually resume a stopped managed install, named in every message that leaves it stopped.
-    const recoverCommand = pkg ? 'kakao-max setup --repair'
+    const recoverCommand = pkg ? 'kakao-mcp setup --repair'
       : `sudo node --experimental-strip-types apps/mcp/src/update-managed.ts --via-deploy ${h.target} "<reason>" --recover (from the clean published checkout)`;
-    const repairCommand = pkg ? 'kakao-max setup --repair' : 'npm run setup -- --repair';
+    const repairCommand = pkg ? 'kakao-mcp setup --repair' : 'npm run setup -- --repair';
     const pinLabel = (release: string | undefined, pin: string) => pkg && release ? releaseLabel(release, pin) : pin.slice(0, 12);
     if (pending && !h.recover) throw new KakaoError('CONFIG_INVALID', `A previous update did not finish and the service may be stopped. Run: ${recoverCommand}. Nothing was stopped`);
     if (![1, 2].includes(state.version) || (state.phase !== 'running' && !(h.recover && state.phase === 'configured')) || !validPin || state.deviceUuid !== undefined) throw new KakaoError('CONFIG_INVALID', 'Managed update requires running state, or explicit recovery of a configured installation');
@@ -440,12 +440,12 @@ export async function updateManaged(h: UpdateHost): Promise<void> {
 if (isMainModule(import.meta.url, 'update-managed')) {
   const main = async () => {
     if (process.platform !== 'linux' || process.getuid?.() !== 0 || ![5, 6].includes(process.argv.length) || process.argv[2] !== '--via-deploy' || (process.argv.length === 6 && !['--recover', '--repair'].includes(process.argv[5]))) {
-      throw new KakaoError('POLICY_DENIED', packagedEntry() ? 'Use kakao-max setup --update or --repair' : 'Use sudo scripts/install.sh repair (or the operator deploy script for updates)');
+      throw new KakaoError('POLICY_DENIED', packagedEntry() ? 'Use kakao-mcp setup --update or --repair' : 'Use sudo scripts/install.sh repair (or the operator deploy script for updates)');
     }
     const release = packagedEntry() ? protectedRelease(installRoot()) : undefined;
     const node = fs.realpathSync('/usr/bin/node'); protectedPath(node, false, 0);
     const npm = release ? '' : fs.realpathSync('/usr/bin/npm'); if (npm) protectedPath(npm, false, 0);
-    await updateManaged({ repo: installRoot(), release, root: '/var/lib/kakao-max', unitFile: '/etc/systemd/system/kakao-max.service', legacyRoot: LEGACY_ROOT, legacyUnitFile: LEGACY_UNIT, node, npm, target: process.argv[3], reason: process.argv[4], recover: ['--recover', '--repair'].includes(process.argv[5]),
+    await updateManaged({ repo: installRoot(), release, root: '/var/lib/kakao-mcp', unitFile: '/etc/systemd/system/kakao-mcp.service', legacyRoot: LEGACY_ROOT, legacyUnitFile: LEGACY_UNIT, node, npm, target: process.argv[3], reason: process.argv[4], recover: ['--recover', '--repair'].includes(process.argv[5]),
       configureLogin: process.argv[5] === '--repair' ? (file, data, uid) => configureManagedLogin(file, data, uid, terminalPrompt) : undefined,
       run: (program, args, allowFailure, cwd) => {
         const command = ['/usr/bin', '/usr/sbin', '/bin', '/sbin'].map(dir => path.join(dir, program)).find(p => fs.existsSync(p));

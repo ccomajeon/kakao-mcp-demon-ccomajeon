@@ -14,7 +14,7 @@ const EMAIL = 'operator@example.test', PASSWORD = 'fixture-password-never-log', 
 function release(parent: string, name: string, version: string, body: string) {
   const dir = path.join(parent, name);
   fs.mkdirSync(path.join(dir, 'dist/web-public'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'kakao-max', version }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'kakao-mcp', version }));
   fs.writeFileSync(path.join(dir, 'LICENSE'), 'MIT fixture');
   fs.writeFileSync(path.join(dir, 'dist/mcp.mjs'), body);
   fs.writeFileSync(path.join(dir, 'dist/web-public/index.html'), '<!doctype html>');
@@ -34,7 +34,7 @@ function fixture(t: { after(fn: () => void): void }) {
     log: () => {}, prompt: async q => q.startsWith('자동 재로그인을 위해') || q.startsWith('에이전트 모드') ? '' : answers.shift() ?? '',
     run: (program, args) => {
       commands.push({ program, args });
-      if (program === 'getent') return user ? `kakao-max:x:${uid}:${gid}::/var/lib/kakao-max:/usr/sbin/nologin` : '';
+      if (program === 'getent') return user ? `kakao-mcp:x:${uid}:${gid}::/var/lib/kakao-mcp:/usr/sbin/nologin` : '';
       if (program === 'useradd') user = true;
       if (program === 'id') return String(args[0] === '-u' ? uid : gid);
       if (program === 'systemctl' && args[0] === 'enable') started = true;
@@ -73,10 +73,10 @@ test('a package bootstrap copies and pins the release without Git, npm or a buil
   assert.equal(releaseDigest(app), f.host.release!.digest);
   assert.ok(fs.existsSync(path.join(app, '.env.local')));
   const unit = fs.readFileSync(f.host.unitFile, 'utf8');
-  assert.equal(unit, serviceUnit(app, path.join(f.root, 'data'), '/usr/bin/node', 'kakao-max', undefined, 'package'));
+  assert.equal(unit, serviceUnit(app, path.join(f.root, 'data'), '/usr/bin/node', 'kakao-mcp', undefined, 'package'));
   assert.match(unit, /^ExecStart="\/usr\/bin\/node" dist\/mcp\.mjs$/m);
   assert.ok(!unit.includes('--experimental-strip-types'));
-  assert.ok(f.commands.some(c => c.program === 'chown' && c.args.includes('root:kakao-max')));
+  assert.ok(f.commands.some(c => c.program === 'chown' && c.args.includes('root:kakao-mcp')));
   assert.match(fs.readFileSync(path.join(f.root, 'deploys.log'), 'utf8'), new RegExp(`human 0\\.1\\.0 sha256:${f.host.release!.digest} `));
 });
 
@@ -124,14 +124,14 @@ test('a package update stops the daemon, swaps the release, keeps credentials an
     }, healthy: async () => active, wait: async () => {} };
   await updateManaged(update);
   assert.ok(!commands.some(c => c.startsWith('git ') || c.startsWith('runuser ')));
-  assert.ok(commands.indexOf('systemctl stop kakao-max.service') < commands.indexOf('systemctl start kakao-max.service'));
+  assert.ok(commands.indexOf('systemctl stop kakao-mcp.service') < commands.indexOf('systemctl start kakao-mcp.service'));
   assert.equal(fs.readFileSync(env, 'utf8'), credentials);
   assert.equal(releaseDigest(path.join(f.root, 'app')), next.digest);
   assert.deepEqual(f.state(), { version: 2, release: '0.2.0', digest: next.digest, phase: 'running', port: 8787 });
 
   commands.length = 0; await updateManaged(update);
-  assert.ok(!commands.includes('systemctl stop kakao-max.service'), 'the same release does not restart the daemon');
-  await assert.rejects(updateManaged({ ...update, release: undefined, target: 'b'.repeat(40) }), /set up from the kakao-max package/);
+  assert.ok(!commands.includes('systemctl stop kakao-mcp.service'), 'the same release does not restart the daemon');
+  await assert.rejects(updateManaged({ ...update, release: undefined, target: 'b'.repeat(40) }), /set up from the kakao-mcp package/);
   fs.writeFileSync(path.join(f.root, 'app/dist/mcp.mjs'), 'tampered');
   await assert.rejects(updateManaged({ ...update, release: f.host.release }), /differ from the recorded release/);
   assert.equal(active, true);
@@ -169,13 +169,13 @@ test('a package update whose release cannot be installed puts the previous relea
   assert.equal(releaseDigest(p.app), p.f.host.release!.digest);
   assert.deepEqual(p.f.state(), before);
   assert.equal(p.active(), true);
-  assert.ok(p.commands.indexOf('systemctl stop kakao-max.service') < p.commands.indexOf('systemctl start kakao-max.service'));
+  assert.ok(p.commands.indexOf('systemctl stop kakao-mcp.service') < p.commands.indexOf('systemctl start kakao-mcp.service'));
   assert.equal(p.commands.filter(c => c.startsWith('systemctl start')).length, 1);
   assert.equal(fs.readFileSync(p.env, 'utf8'), p.credentials);
   assert.equal(fs.existsSync(path.join(p.f.root, 'rollback')), false);
 });
 
-test('a package update that cannot restore its previous release records the failure and kakao-max setup --repair finishes it', async t => {
+test('a package update that cannot restore its previous release records the failure and kakao-mcp setup --repair finishes it', async t => {
   const p = await installedPackage(t);
   // Lose the kept copy right after the daemon stops.
   const run = p.update.run;
@@ -183,11 +183,11 @@ test('a package update that cannot restore its previous release records the fail
     if (program === 'systemctl' && args[0] === 'stop') fs.rmSync(path.join(p.f.root, 'rollback'), { recursive: true, force: true });
     return run(program, args);
   } };
-  await assert.rejects(updateManaged({ ...update, release: p.broken }), (e: any) => e.code === 'STORAGE_UNSAFE' && /could not be restored/.test(e.message) && /kakao-max setup --repair/.test(e.message));
+  await assert.rejects(updateManaged({ ...update, release: p.broken }), (e: any) => e.code === 'STORAGE_UNSAFE' && /could not be restored/.test(e.message) && /kakao-mcp setup --repair/.test(e.message));
   assert.equal(p.active(), false);
   assert.equal(p.f.state().pendingUpdate, p.broken.digest);
   assert.equal(p.f.state().release, '0.1.0');
-  await assert.rejects(updateManaged(update), /did not finish.*kakao-max setup --repair/);
+  await assert.rejects(updateManaged(update), /did not finish.*kakao-mcp setup --repair/);
 
   const fixed = release(p.f.parent, 'release-3', '0.2.1', '// daemon 0.2.1\n');
   await updateManaged({ ...update, release: fixed, recover: true });

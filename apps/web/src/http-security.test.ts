@@ -51,7 +51,7 @@ test('only a request carrying this launch secret has a session', () => {
 
 test('the launch cookie is browser-only and never sent cross-site', () => {
   const set = sessionCookie(PORT, 'abc');
-  assert.match(set, /^kakao_max_web_8899=abc;/);
+  assert.match(set, /^kakao_mcp_web_8899=abc;/);
   assert.match(set, /HttpOnly/); assert.match(set, /SameSite=Strict/); assert.match(set, /Path=\//);
 });
 

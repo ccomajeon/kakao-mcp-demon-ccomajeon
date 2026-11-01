@@ -7,7 +7,7 @@ export const PAGE_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>kakao-max 승인</title>
+<title>kakao-mcp 승인</title>
 <link rel="stylesheet" href="/app.css">
 <script src="/app.js" defer></script>
 </head>
@@ -126,7 +126,7 @@ function showEnroll() {
     go.disabled = true;
     try {
       const o = await api('/api/enroll/options', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.value }) });
-      const cred = await navigator.credentials.create({ publicKey: { challenge: dec(o.challenge), rp: { id: o.rpId, name: 'kakao-max 승인' },
+      const cred = await navigator.credentials.create({ publicKey: { challenge: dec(o.challenge), rp: { id: o.rpId, name: 'kakao-mcp 승인' },
         user: { id: dec(o.userId), name: o.userName, displayName: label.value || o.userName },
         pubKeyCredParams: [{ type: 'public-key', alg: -8 }, { type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { userVerification: 'required', residentKey: 'preferred' }, attestation: 'none', timeout: 120000,
@@ -143,5 +143,5 @@ function showEnroll() {
 const m = location.pathname.match(/^\\/a\\/([0-9a-f-]{36})$/);
 if (m) showApproval(m[1], location.hash.slice(1)).catch(e => { app.replaceChildren(el('h1', '요청을 열 수 없습니다'), el('p', '만료됐거나, 이미 처리됐거나, 링크가 잘못됐습니다. (' + e.message + ')', 'muted')); });
 else if (location.pathname === '/enroll') showEnroll();
-else app.replaceChildren(el('h1', 'kakao-max 승인'), el('p', '승인 링크로 들어오세요. 패스키 등록은 /enroll 입니다.', 'muted'));
+else app.replaceChildren(el('h1', 'kakao-mcp 승인'), el('p', '승인 링크로 들어오세요. 패스키 등록은 /enroll 입니다.', 'muted'));
 `;

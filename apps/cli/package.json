@@ -1,18 +1,18 @@
 {
-  "name": "@kakao-max/cli",
+  "name": "@kakao-mcp/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "kakao-max": "./src/index.ts",
+    "kakao-mcp": "./src/index.ts",
     "kakao": "./src/index.ts"
   },
   "dependencies": {
-    "@kakao-max/core": "*",
-    "@kakao-max/client": "*"
+    "@kakao-mcp/core": "*",
+    "@kakao-mcp/client": "*"
   },
   "scripts": {
-    "kakao-max": "node --experimental-strip-types src/index.ts",
+    "kakao-mcp": "node --experimental-strip-types src/index.ts",
     "kakao": "node --experimental-strip-types src/index.ts",
     "test": "node --experimental-strip-types --test src/*.test.ts"
   }

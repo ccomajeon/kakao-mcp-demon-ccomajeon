@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { randomUUID } from 'node:crypto';
-import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, MCP_TOOL_GROUPS, agentModeApproves } from '@kakao-max/core';
+import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy, MCP_TOOL_GROUPS, agentModeApproves } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { checkToolGroups, loadOptionalModules, registerOptionalModules, type OptionalMcpModule } from './optional-modules.ts';
 import { registerPermissionTools, registerNamedOperationTools, agentControlAdapter, grantViews, NAMED_OPERATION_TOOLS } from './tools/agent-operations.ts';
@@ -214,7 +214,7 @@ test('an optional module adds its own approved operation, label and group, and i
   assert.deepEqual(effects, [JSON.stringify({ chatId: CHAT })]);
   assert.throws(() => checkToolGroups(['fixture'], MCP_TOOL_GROUPS, []), { code: 'CONFIG_INVALID' });
   checkToolGroups(['fixture', 'chats'], MCP_TOOL_GROUPS, [fixture]);
-  assert.deepEqual(await loadOptionalModules({} as never, ['@kakao-max/not-installed-fixture/mcp']), []);
+  assert.deepEqual(await loadOptionalModules({} as never, ['@kakao-mcp/not-installed-fixture/mcp']), []);
   const without = harness(t);
   assert.equal((await without.call('import_fixture', request)).rpcError.code, -32602);
 });

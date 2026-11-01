@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import os from 'node:os';
-import { KakaoError, SendPolicy } from '@kakao-max/core';
+import { KakaoError, SendPolicy } from '@kakao-mcp/core';
 import { McpStdioServer } from '../../mcp/src/mcp-stdio.ts';
 import { registerCoreReadTools } from '../../mcp/src/tools/core-read.ts';
 import { registerAgentMessageTools } from '../../mcp/src/tools/agent-messages.ts';
@@ -24,7 +24,7 @@ function fixtureGate() {
     approved: false, answers: [] as unknown[],
     request: (_tool: string, _args: unknown, approval: { requestId: string }, client: { elicitation: boolean }) => !client.elicitation ? undefined : {
       resultType: 'input_required' as const, requestState: `state:${approval.requestId}`,
-      inputRequests: { approve: { method: 'elicitation/create' as const, params: { mode: 'form', message: '[kakao-max] 대화방 읽기 승인 요청\n<img src=x onerror=alert(1)>\n승인하려면 확인 코드 ABCD 를 입력하세요.',
+      inputRequests: { approve: { method: 'elicitation/create' as const, params: { mode: 'form', message: '[kakao-mcp] 대화방 읽기 승인 요청\n<img src=x onerror=alert(1)>\n승인하려면 확인 코드 ABCD 를 입력하세요.',
         requestedSchema: { type: 'object', properties: { code: { type: 'string', title: '확인 코드', description: 'ABCD 입력' }, remember: { type: 'boolean', title: '이 방은 앞으로 묻지 않고 읽기' } }, required: ['code'] } } } }
     },
     answer: (_tool: string, _args: unknown, _state: unknown, responses: any) => {
@@ -73,7 +73,7 @@ async function daemon(t: { after(fn: () => unknown): void }, opts: { gate?: Retu
     commit: async () => ({ status: 0, state: 'applied_unverified' })
   });
   const server = new McpStdioServer({ name: 'contract', version: '0', toolGroups: ['chats', 'friends'] });
-  const policy = new SendPolicy({ ceiling: [], pausedAtStart: false, auditLogPath: `${os.tmpdir()}/kakao-max-web-contract-audit` });
+  const policy = new SendPolicy({ ceiling: [], pausedAtStart: false, auditLogPath: `${os.tmpdir()}/kakao-mcp-web-contract-audit` });
   registerCoreReadTools(server, { kakao: kakao as never, policy, groups: ['chats', 'friends'], grants: () => undefined, engine: () => engine as never,
     config: { recipientDailyLimit: null, addFriendDailyLimit: 10, dataDir: os.tmpdir(), agentMode: 'trust', agentModeSource: 'setting', approval: { clientConfirm: false } } as never });
   registerAgentMessageTools(server, () => service('send') as never);

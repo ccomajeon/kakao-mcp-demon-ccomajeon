@@ -1,4 +1,4 @@
-import { KakaoError, type KakaoSession, type SendPolicy } from '@kakao-max/core';
+import { KakaoError, type KakaoSession, type SendPolicy } from '@kakao-mcp/core';
 import type { McpStdioServer } from './mcp-stdio.ts';
 
 const TEMPLATE = 'kakao://rooms/{chatId}/messages';

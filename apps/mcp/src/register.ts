@@ -9,7 +9,7 @@
 // never force-login or stop another owner automatically.
 //
 // The registration flow itself (login → request_sign → poll confirm_sign on phone
-// approval → login) lives in @kakao-max/protocol (KakaoDeviceRegistration,
+// approval → login) lives in @kakao-mcp/protocol (KakaoDeviceRegistration,
 // verified against a live registration). This module is the thin bootstrap around it: read the
 // account email/password from .env.local, run the flow with an on-screen "approve on
 // your phone" prompt, then persist the generated device_uuid + fresh tokens back to
@@ -19,13 +19,13 @@
 //   KAKAO_PASSWORD    account password            (required; sensitive — .env.local only)
 //   KAKAO_DEVICE_NAME device label (default below)
 //
-// Run:  npm run register --workspace=@kakao-max/mcp
+// Run:  npm run register --workspace=@kakao-mcp/mcp
 // Safe to re-run; it rewrites only the KAKAO_* keys it owns. Zero runtime deps;
 // runs under `node --experimental-strip-types` (no TS parameter properties / enums).
 // ----------------------------------------------------------------------------
 
-import { KakaoDeviceRegistration, type SignRegistrationResult } from '@kakao-max/protocol';
-import { CredentialStore, isMainModule, setupCommand } from '@kakao-max/core';
+import { KakaoDeviceRegistration, type SignRegistrationResult } from '@kakao-mcp/protocol';
+import { CredentialStore, isMainModule, setupCommand } from '@kakao-mcp/core';
 
 /** Default device label shown in the account's 인증 기기 관리 (device management) list. */
 export const DEFAULT_DEVICE_NAME = 'KakaoWeb-MCP';

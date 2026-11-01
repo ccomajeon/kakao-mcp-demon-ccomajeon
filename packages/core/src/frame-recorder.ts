@@ -21,7 +21,7 @@
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import type { LocoFrame } from '@kakao-max/protocol';
+import type { LocoFrame } from '@kakao-mcp/protocol';
 
 /** Keys whose numeric value is a time-ordered LOCO log id. */
 const LOG_ID_KEYS = new Set([

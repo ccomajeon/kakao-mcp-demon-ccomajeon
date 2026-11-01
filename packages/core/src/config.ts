@@ -5,7 +5,7 @@
 // has a safe default; invalid values fail fast with CONFIG_INVALID instead of
 // being silently ignored.
 //
-//   KAKAO_DATA_DIR             local data directory (default ~/.kakao-max, fallback ~/.kakao)
+//   KAKAO_DATA_DIR             local data directory (default ~/.kakao-mcp, fallback ~/.kakao)
 //   KAKAO_APP_VERSION          KakaoTalk client version we present (default 26.4.0).
 //                              Raise it when Kakao rejects old clients.
 //   KAKAO_CLIENT_OS            client OS we present: only `mac` is verified (default mac)
@@ -189,12 +189,12 @@ export function resetLegacyDataDirNoticeForTests(): void {
 
 function resolveDataDir(explicitDir: string | undefined, home: string): string {
   if (explicitDir) return path.resolve(explicitDir);
-  const newDefault = path.join(home, '.kakao-max');
+  const newDefault = path.join(home, '.kakao-mcp');
   const legacyDefault = path.join(home, '.kakao');
   if (!fs.existsSync(newDefault) && fs.existsSync(legacyDefault)) {
     if (!loggedLegacyDataDirNotice) {
       loggedLegacyDataDirNotice = true;
-      console.error('[kakao-max] Using the legacy data directory; migrate it to ~/.kakao-max when convenient.');
+      console.error('[kakao-mcp] Using the legacy data directory; migrate it to ~/.kakao-mcp when convenient.');
     }
     return legacyDefault;
   }

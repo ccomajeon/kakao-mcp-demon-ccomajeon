@@ -55,7 +55,7 @@ test('publication guard recognizes a SQLite file even with an innocent filename'
 
 test('Git excludes account stores and exports without excluding TypeScript fixtures', t => {
   const f = fixture(t); fs.writeFileSync(path.join(f.root, '.gitignore'), ignore);
-  for (const file of ['.kakao-max/kakao.db', '.kakao/kakao.db', 'nested/kakao.db-wal', 'x.sqlite3-shm',
+  for (const file of ['.kakao-mcp/kakao.db', '.kakao/kakao.db', 'nested/kakao.db-wal', 'x.sqlite3-shm',
     'vault/exports/123.html', 'downloads/123/photo.jpg', 'nested/friends.json.migrated-123',
     'messages.jsonl', 'frames.jsonl', 'credentials.json', 'approver-enroll.json', 'auth-relogin.json']) {
     const result = spawnSync('git', ['check-ignore', '--no-index', '-q', file], { cwd: f.root });

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { readOwnerOnlyJson, writeOwnerOnlyJson } from '@kakao-max/core';
+import { readOwnerOnlyJson, writeOwnerOnlyJson } from '@kakao-mcp/core';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TTL = 10 * 60_000;

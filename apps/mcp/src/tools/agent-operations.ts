@@ -1,7 +1,7 @@
 import { waitForApproval } from '../approval-center.ts';
 import { prepareAndCommit, REQUEST_ID } from './one-call.ts';
 import { randomUUID } from 'node:crypto';
-import { KakaoError, READ_GRANT_TOOLS, type DailyActionLimit, type RecipientPermissions, type KakaoSession, type SendPolicy, type PolicyDecision, type AgentOperationEngine, type AgentOperationEngineAdapter, type AgentOperationInspection, type GrantRoomAccessRequest } from '@kakao-max/core';
+import { KakaoError, READ_GRANT_TOOLS, type DailyActionLimit, type RecipientPermissions, type KakaoSession, type SendPolicy, type PolicyDecision, type AgentOperationEngine, type AgentOperationEngineAdapter, type AgentOperationInspection, type GrantRoomAccessRequest } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

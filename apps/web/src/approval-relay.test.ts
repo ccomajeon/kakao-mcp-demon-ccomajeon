@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ApprovalRelay } from './approval-relay.ts';
 import { parseApprovalDialog, type ApprovalAnswer, type ApprovalDialog } from './mcp-bridge.ts';
 
-const dialog = (id = 'approval:1'): ApprovalDialog => ({ id, message: '[kakao-max] 승인 요청', codeTitle: '확인 코드', codeDescription: 'ABCD' });
+const dialog = (id = 'approval:1'): ApprovalDialog => ({ id, message: '[kakao-mcp] 승인 요청', codeTitle: '확인 코드', codeDescription: 'ABCD' });
 
 function relay(viewers = true, timeoutMs?: number) {
   const answers: Array<[string, ApprovalAnswer]> = [], events: Array<[string, unknown]> = [];

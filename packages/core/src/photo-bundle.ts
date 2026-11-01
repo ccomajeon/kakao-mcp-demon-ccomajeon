@@ -1,4 +1,4 @@
-import type { PhotoUploadItem } from '@kakao-max/protocol';
+import type { PhotoUploadItem } from '@kakao-mcp/protocol';
 import { KakaoError } from './errors.ts';
 
 /** Read actual dimensions from PNG IHDR / JPEG SOF; never trust caller-supplied dimensions. */

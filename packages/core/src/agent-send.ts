@@ -34,7 +34,7 @@ export interface AgentOperationAdapter<T extends { chatId: string }> {
 export interface SendAttempt { msgId: number }
 /** A stable client message ID for a request: a retry with the same requestId carries the same msgId. */
 export function clientMsgIdFor(requestId: string): number {
-  return (createHash('sha256').update(`kakao-max:msgId:${requestId}`).digest().readUInt32BE(0) & 0x7fffffff) || 1;
+  return (createHash('sha256').update(`kakao-mcp:msgId:${requestId}`).digest().readUInt32BE(0) & 0x7fffffff) || 1;
 }
 interface AttemptRecord { chatId: string; msgId: number; since: string; at: number }
 /** How long after an attempt an absent message counts as not delivered: a slow server may still be processing it. */

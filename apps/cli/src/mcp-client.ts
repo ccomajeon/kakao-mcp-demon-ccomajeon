@@ -82,7 +82,7 @@ export class McpClient {
     // readline re-emits socket errors, already reported through failAll above.
     readline.createInterface({ input: s }).on('error', () => {}).on('line', (line) => this.onLine(line));
     try { await this.request('initialize', {
-      clientInfo: { name: 'kakao-max-cli', version: '0.1.0' },
+      clientInfo: { name: 'kakao-mcp-cli', version: '0.1.0' },
       ...(this.onElicitation ? { protocolVersion: '2025-11-25', capabilities: { elicitation: { form: {} } } } : {})
     }, 10000); } catch (e) { this.close(); throw e; }
   }

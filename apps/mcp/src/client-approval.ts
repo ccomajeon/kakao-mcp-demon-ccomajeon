@@ -4,7 +4,7 @@
 // requestState. The model never answers the dialog; trust rests on the client presenting it to a human,
 // so this tier is weaker than a passkey and can be switched off (KAKAO_APPROVAL_CLIENT_CONFIRM=off).
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { KakaoError, canonicalAgentJson, RECIPIENT_ACTIONS, type ApprovalStore, type RecipientPermissions } from '@kakao-max/core';
+import { KakaoError, canonicalAgentJson, RECIPIENT_ACTIONS, type ApprovalStore, type RecipientPermissions } from '@kakao-mcp/core';
 
 export interface ClientContext { name: string; elicitation: boolean }
 export interface ApprovalDetails { requestId: string; signingText: string; expiresAt: number }
@@ -55,7 +55,7 @@ export function approvalMessage(signingText: string, confirmCode?: string, asRoo
   // Room titles are set by any member: keep them on one line so a title cannot add lines that look like the server's own.
   const rawRoom = e.context?.room?.title ?? e.context?.target?.chatId ?? body.chatId ?? body.userId;
   const room = rawRoom == null ? undefined : String(rawRoom).replace(/[\r\n\u2028\u2029]+/g, ' ⏎ ');
-  const lines = [`[kakao-max] ${approvalLabel(asRoomPermission ? 'allow_recipient' : e.action)} 승인 요청`, `계정 ${e.accountId}`, ...(room ? [`대상 ${room}`] : [])];
+  const lines = [`[kakao-mcp] ${approvalLabel(asRoomPermission ? 'allow_recipient' : e.action)} 승인 요청`, `계정 ${e.accountId}`, ...(room ? [`대상 ${room}`] : [])];
   if (typeof body.text === 'string') lines.push('', '내용:', body.text);
   if (e.action === 'read_room') lines.push('', `이 방의 메시지를 이번 한 번만 AI에게 보여 줍니다(최대 ${body.maxMessages}개, ${body.ttlMinutes}분 안에 ${body.uses}회). 읽음 표시는 보내지 않습니다.`,
     '"이 방은 앞으로 묻지 않고 읽기"를 켜면 다음부터 묻지 않습니다. "이 방에 답장도 묻지 않고 보내기"를 켜면 이 방의 메시지·사진을 하루 한도 안에서 바로 보냅니다.',

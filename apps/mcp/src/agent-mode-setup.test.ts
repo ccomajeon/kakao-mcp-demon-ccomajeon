@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { TRUST_RISK_NOTICE, readEnvFile } from '@kakao-max/core';
+import { TRUST_RISK_NOTICE, readEnvFile } from '@kakao-mcp/core';
 import { setAgentMode } from './setup.ts';
 import { SERVER_INSTRUCTIONS, serverInstructions } from './instructions.ts';
 

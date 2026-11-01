@@ -3,17 +3,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { KakaoError, writeOwnerOnlyJson, isOwnerOnly, writeEnvKeys, readEnvFile, findEnvFile, AGENT_MODES, TRUST_RISK_NOTICE, type AgentMode, isMainModule, installRoot, packagedEntry, programArgs, setupCommand, type ProgramName } from '@kakao-max/core';
+import { KakaoError, writeOwnerOnlyJson, isOwnerOnly, writeEnvKeys, readEnvFile, findEnvFile, AGENT_MODES, TRUST_RISK_NOTICE, type AgentMode, isMainModule, installRoot, packagedEntry, programArgs, setupCommand, type ProgramName } from '@kakao-mcp/core';
 import { confirmSetup, terminalPrompt, type SetupPrompt } from './setup-prompts.ts';
 import { installPort } from './setup-system.ts';
 import { diagnoseConnection } from './connection-doctor.ts';
 import { parseListenSpec, validateListenSpec } from './socket-transport.ts';
 
-export interface McpConnectionConfig { mcpServers: { 'kakao-max': { command: string; args: string[] } } }
+export interface McpConnectionConfig { mcpServers: { 'kakao-mcp': { command: string; args: string[] } } }
 const ROOT = installRoot();
 
 export function resolveClientConfigFile(homedir = os.homedir()): { file: string; isFallback: boolean } {
-  const newPath = path.join(homedir, '.config/kakao-max/mcp.json');
+  const newPath = path.join(homedir, '.config/kakao-mcp/mcp.json');
   const oldPath = path.join(homedir, '.config/kakaotalk-mcp/mcp.json');
   if (!fs.existsSync(newPath) && fs.existsSync(oldPath)) {
     return { file: oldPath, isFallback: true };
@@ -29,7 +29,7 @@ export function connectionConfig(opts: { ssh?: string; listen?: string; repo?: s
   if (opts.ssh && (!/^(?:[a-zA-Z0-9_][a-zA-Z0-9_.-]*@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(opts.ssh) || opts.ssh.length > 253)) {
     throw new KakaoError('INVALID_ARGUMENT', 'Use an SSH host alias or user@host, without flags or shell commands');
   }
-  return { mcpServers: { 'kakao-max': { command: opts.node ?? process.execPath,
+  return { mcpServers: { 'kakao-mcp': { command: opts.node ?? process.execPath,
     args: [...programArgs('connect', { root: opts.repo ?? ROOT, packaged: opts.packaged }), '--resilient', '--listen', listen,
       ...(opts.ssh ? ['--ssh', opts.ssh] : [])] } } };
 }
@@ -77,14 +77,14 @@ export function setAgentMode(opts: { envPath: string; mode: string; acceptRisk: 
 
 /** Ready-to-run registration for common MCP clients; other clients take the printed JSON. */
 export function registrationHint(config: McpConnectionConfig, platform: string = process.platform): string {
-  const { command, args } = config.mcpServers['kakao-max'];
+  const { command, args } = config.mcpServers['kakao-mcp'];
   const quote = (s: string) => /^[A-Za-z0-9_./:@=+-]+$/.test(s) ? s : platform === 'win32' ? `"${s}"` : `'${s.replace(/'/g, `'\\''`)}'`;
   const line = [command, ...args].map(quote).join(' ');
-  return [`  Claude Code:  claude mcp add --scope user kakao-max -- ${line}`, `  Codex:        codex mcp add kakao-max -- ${line}`,
+  return [`  Claude Code:  claude mcp add --scope user kakao-mcp -- ${line}`, `  Codex:        codex mcp add kakao-mcp -- ${line}`,
     '  그 밖의 클라이언트(Claude Desktop 등): 아래 JSON의 mcpServers 항목을 그 설정에 넣으세요.'].join('\n');
 }
 
-const MANAGED_ROOT = '/var/lib/kakao-max';
+const MANAGED_ROOT = '/var/lib/kakao-mcp';
 /** The managed daemon's settings file; written as root, keeping its owner (the service account). */
 export const MANAGED_ENV = path.join(MANAGED_ROOT, 'app/.env.local');
 
@@ -122,7 +122,7 @@ export async function runSetup(deps: {
   const config = connectionConfig({ ssh: ssh || undefined, listen, repo: deps.repo });
   const resolved = resolveClientConfigFile();
   if (resolved.isFallback && resolved.file === deps.configFile) {
-    deps.log(`기존 설정 파일 사용: ${deps.configFile}. kakao-max 기본 경로로 옮기려면 디렉터리를 ~/.config/kakao-max 로 이동하세요.`);
+    deps.log(`기존 설정 파일 사용: ${deps.configFile}. kakao-mcp 기본 경로로 옮기려면 디렉터리를 ~/.config/kakao-mcp 로 이동하세요.`);
   }
   await saveConnection(deps.configFile, config, deps.prompt);
   deps.log(`연결 설정 저장: ${deps.configFile}. 기존 AI 설정 파일은 자동 편집하지 않습니다. AI에 등록하려면:`);
@@ -188,9 +188,9 @@ if (isMainModule(import.meta.url, 'setup')) {
       // The daemon reads the mode at start. A pause set while it runs does not survive a restart.
       let restart = false;
       try { restart = await confirmSetup(terminalPrompt, '지금 서비스를 다시 시작해 적용할까요? 실행 중에 건 일시정지는 풀립니다.', true); } catch { /* no terminal */ }
-      if (!restart) { process.stderr.write('적용하려면: sudo systemctl restart kakao-max\n'); return; }
-      const restarted = spawnSync('systemctl', ['restart', 'kakao-max'], { stdio: 'inherit' });
-      if (restarted.status !== 0) throw new KakaoError('CONFIG_INVALID', 'The mode was saved but the service did not restart; run sudo systemctl restart kakao-max');
+      if (!restart) { process.stderr.write('적용하려면: sudo systemctl restart kakao-mcp\n'); return; }
+      const restarted = spawnSync('systemctl', ['restart', 'kakao-mcp'], { stdio: 'inherit' });
+      if (restarted.status !== 0) throw new KakaoError('CONFIG_INVALID', 'The mode was saved but the service did not restart; run sudo systemctl restart kakao-mcp');
       return;
     }
     if (args[0] === '--config') {

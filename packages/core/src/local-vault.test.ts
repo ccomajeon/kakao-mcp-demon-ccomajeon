@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { removeTestDir } from './temp-dir.test-helper.ts';
 import os from 'node:os';
 import path from 'node:path';
-import type { ResilientLocoSession } from '@kakao-max/protocol';
+import type { ResilientLocoSession } from '@kakao-mcp/protocol';
 import { KakaoDb } from './db.ts';
 import { LocalVault, vaultMediaFileName } from './local-vault.ts';
 import { collectSharedLinks, extractScheduleAndTodos } from './curation-tools.ts';

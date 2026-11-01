@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { randomUUID } from 'node:crypto';
-import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, RecipientPermissions, SendPolicy } from '@kakao-max/core';
+import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, RecipientPermissions, SendPolicy } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { ElicitationApprovals, approvalMessage } from './client-approval.ts';
 import { registerAgentMessageTools } from './tools/agent-messages.ts';

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { removeTestDir } from './temp-dir.test-helper.ts';
 import os from 'node:os';
 import path from 'node:path';
-import { Long, type ResilientLocoSession } from '@kakao-max/protocol';
+import { Long, type ResilientLocoSession } from '@kakao-mcp/protocol';
 import { KakaoSession } from './kakao-session.ts';
 import { KakaoDb } from './db.ts';
 import { MessageStore } from './message-store.ts';

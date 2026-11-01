@@ -29,9 +29,9 @@ for (const [name, source] of Object.entries(programs)) {
   await build({
     entryPoints: [path.join(root, source)], outfile: path.join(dist, `${name}.mjs`),
     bundle: true, platform: 'node', format: 'esm', target: 'node22', external: ['node:*'],
-    define: { __KAKAO_MAX_ENTRY__: JSON.stringify(name) }, legalComments: 'eof', logLevel: 'warning',
+    define: { __KAKAO_MCP_ENTRY__: JSON.stringify(name) }, legalComments: 'eof', logLevel: 'warning',
     // Bundled CommonJS (the protocol build, bson) still calls require() for Node built-ins.
-    banner: { js: "import { createRequire as __kakaoMaxRequire } from 'node:module';\nconst require = __kakaoMaxRequire(import.meta.url);" },
+    banner: { js: "import { createRequire as __kakaoMcpRequire } from 'node:module';\nconst require = __kakaoMcpRequire(import.meta.url);" },
   });
   // esbuild keeps an entry's own hashbang first; add one where the source has none.
   const out = path.join(dist, `${name}.mjs`), code = fs.readFileSync(out, 'utf8');

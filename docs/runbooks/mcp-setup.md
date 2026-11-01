@@ -65,7 +65,7 @@ credentials 저장 후 manifest에서 제거한다. 이는 대화·사용자 데
 빌드 실패는 같은 checkout에서 재개하고, 이미 저장한 credentials가 있으면 다시 등록하지 않는다.
 실행 중인 정상 설치는 재시작하지 않는다. operator-paused가 있으면 재개하지 않는다.
 
-강제 종료로 `/var/lib/kakao-max.install-lock`이 남았다면 PID와 실행 중인 설치/서비스를 먼저 확인한다.
+강제 종료로 `/var/lib/kakao-mcp.install-lock`이 남았다면 PID와 실행 중인 설치/서비스를 먼저 확인한다.
 자동으로 잠금을 지우거나 다른 프로세스를 중지하지 않는다. 상태 파일이 없거나 버전·권한·unit 내용이
 달라진 설치는 자동 복구 대상으로 취급하지 않는다. 자격증명이나 unit이 생성된 설치는 다른 커밋으로
 업데이트하지 않는다. 로그인 실패 후 prepared 상태이고 자격증명·unit이 없으며 data가 비어 있고,
@@ -75,12 +75,12 @@ credentials 저장 후 manifest에서 제거한다. 이는 대화·사용자 데
 
 | 경로 | 소유/역할 |
 |---|---|
-| `/var/lib/kakao-max/app` | root, Git 코드·빌드 결과, 서비스 사용자에게 쓰기 불가 |
+| `/var/lib/kakao-mcp/app` | root, Git 코드·빌드 결과, 서비스 사용자에게 쓰기 불가 |
 | `app/.env.local` | 서비스 사용자 0600, 토큰·기기 키·데몬 설정, 비밀번호 없음 |
-| `/var/lib/kakao-max/data` | 서비스 사용자 0700, core DB·정책·journal·audit |
-| `/var/lib/kakao-max/install-state.json` | root 0600, 설치 재개 metadata |
-| `/var/lib/kakao-max/deploys.log` | root 0600, 성공 시각·actor·고정 커밋·이유, 계정/본문/토큰 없음 |
-| `/etc/systemd/system/kakao-max.service` | root, 생성한 system unit |
+| `/var/lib/kakao-mcp/data` | 서비스 사용자 0700, core DB·정책·journal·audit |
+| `/var/lib/kakao-mcp/install-state.json` | root 0600, 설치 재개 metadata |
+| `/var/lib/kakao-mcp/deploys.log` | root 0600, 성공 시각·actor·고정 커밋·이유, 계정/본문/토큰 없음 |
+| `/etc/systemd/system/kakao-mcp.service` | root, 생성한 system unit |
 
 새 설치에는 notify destination·env allowlist·사전 방 허가를 넣지 않는다. 프로필 선택 없는 단일 도구 목록·방 허가,
 자동 재로그인 꺼짐, loopback MCP만 설정한다. 방 내용 조회·읽음은 독립된 권한이다.
@@ -91,7 +91,7 @@ credentials 저장 후 manifest에서 제거한다. 이는 대화·사용자 데
 
 ### 관리형 설치 갱신
 
-`apps/mcp/src/update-managed.ts`가 관리형 `/var/lib/kakao-max`(또는 옛 이름 `/var/lib/kakaotalk-mcp`)의 실행 중인 설치를 갱신한다.
+`apps/mcp/src/update-managed.ts`가 관리형 `/var/lib/kakao-mcp`(또는 옛 이름 `/var/lib/kakaotalk-mcp`)의 실행 중인 설치를 갱신한다.
 clean main과 이전 commit, unit 일치, 같은 계정 연결, operator pause 부재를 확인한다. 하나라도 어긋나면 아무것도 멈추지 않는다.
 Git fetch 후 기존 daemon을 먼저 멈추고 코드를 갱신·빌드한 뒤 시작한다. 자격증명·기기 키·data/journal을 보존하며
 계정 등록·강제 로그인·백업을 하지 않는다.
@@ -99,7 +99,7 @@ Git fetch 후 기존 daemon을 먼저 멈추고 코드를 갱신·빌드한 뒤 
 갱신 실패(`npm ci`·`tsc` 실패 등) 때의 동작:
 
 1. 데몬을 멈춘 직후, 코드를 바꾸기 전에 `install-state.json`에 `phase: configured`와 시도 중인 커밋(`pendingUpdate`)을 기록한다.
-   기존 고정 커밋(`commit`)은 그대로 둔다. 기존 `node_modules`는 `/var/lib/kakao-max/rollback/`으로 옮겨 둔다.
+   기존 고정 커밋(`commit`)은 그대로 둔다. 기존 `node_modules`는 `/var/lib/kakao-mcp/rollback/`으로 옮겨 둔다.
 2. 빌드가 실패하면 기존 커밋을 다시 checkout하고 옮겨 둔 `node_modules`를 되돌린 뒤 `tsc`만 다시 실행한다(내려받기 없음).
 3. 되돌린 코드가 기존 커밋과 정확히 같고 `.env.local`이 바뀌지 않았을 때만 같은 서비스를 한 번 시작하고 같은 계정 연결을 확인한다.
    성공하면 manifest는 갱신 전 상태(`phase: running`, 기존 커밋)로 돌아가고, 오류는 "이전 버전을 복원해 실행 중"이라고 보고한다.
@@ -140,7 +140,7 @@ Unix socket을 지정하려면 같은 소유자의 private 디렉터리와 0600 
 npm run --silent setup -- --config --ssh <SSH-대상>
 ```
 
-기본 마법사는 `~/.config/kakao-max/mcp.json`에 0600으로 저장한다(기존 `~/.config/kakaotalk-mcp/mcp.json` fallback 지원). 기존 파일이 다르면 `[y/N]`으로
+기본 마법사는 `~/.config/kakao-mcp/mcp.json`에 0600으로 저장한다(기존 `~/.config/kakaotalk-mcp/mcp.json` fallback 지원). 기존 파일이 다르면 `[y/N]`으로
 확인한다. AI 앱의 설정을 추측해서 편집하지 않는다. SSH 설정은 내 AI가 있는 컴퓨터로 복사/등록한다.
 
 현재 raw MCP listener는 인증된 원격 HTTP API가 아니다. loopback 접근이 가능한 로컬 OS 사용자와

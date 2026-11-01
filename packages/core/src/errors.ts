@@ -7,7 +7,7 @@
 // instead of parsing free-form messages.
 // ----------------------------------------------------------------------------
 
-import { isLocoError } from '@kakao-max/protocol';
+import { isLocoError } from '@kakao-mcp/protocol';
 import { setupCommand } from './entry.ts';
 
 export type KakaoErrorCode =

@@ -1,6 +1,6 @@
 name: private-terms
 
-# An optional KAKAO_MAX_DENYLIST secret adds maintainer-specific terms to public checks.
+# An optional KAKAO_MCP_DENYLIST secret adds maintainer-specific terms to public checks.
 # pull_request_target gives fork PRs the maintainer deny list. That is safe only because this job
 # runs the base branch's scanner on the PR's commits as data: it never checks out or runs PR code.
 on:
@@ -31,7 +31,7 @@ jobs:
       - name: Scan the pull request's commits, title and description
         if: github.event_name == 'pull_request_target'
         env:
-          KAKAO_MAX_DENYLIST: ${{ secrets.KAKAO_MAX_DENYLIST }}
+          KAKAO_MCP_DENYLIST: ${{ secrets.KAKAO_MCP_DENYLIST }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -40,7 +40,7 @@ jobs:
       - name: Scan pushed commits and the whole tree
         if: github.event_name == 'push'
         env:
-          KAKAO_MAX_DENYLIST: ${{ secrets.KAKAO_MAX_DENYLIST }}
+          KAKAO_MCP_DENYLIST: ${{ secrets.KAKAO_MCP_DENYLIST }}
           BEFORE: ${{ github.event.before }}
         run: |
           node scripts/check-private-terms.mjs --tree HEAD

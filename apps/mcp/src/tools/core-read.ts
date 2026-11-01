@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { KakaoError, toKakaoError, type AgentOperationEngine, type DailyActionLimit, type KakaoSession, type KakaoConfig, type ReadApproval, type SendPolicy } from '@kakao-max/core';
+import { KakaoError, toKakaoError, type AgentOperationEngine, type DailyActionLimit, type KakaoSession, type KakaoConfig, type ReadApproval, type SendPolicy } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import { readGrant } from '../read-grant.ts';
 import type { McpStdioServer, McpToolGroup, ToolCallContext } from '../mcp-stdio.ts';

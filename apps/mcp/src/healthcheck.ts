@@ -9,7 +9,7 @@
 // `connected: true`. Wire it to a systemd timer, a cron heartbeat, or Uptime Kuma.
 //
 //   KAKAO_MCP_LISTEN=127.0.0.1:8787 node --experimental-strip-types src/healthcheck.ts
-//   npm run health --workspace=@kakao-max/mcp
+//   npm run health --workspace=@kakao-mcp/mcp
 //
 // Exit codes: 0 healthy, 1 unhealthy/unreachable. Never prints tokens. Zero deps.
 // ----------------------------------------------------------------------------
@@ -17,7 +17,7 @@
 import net from 'node:net';
 import { parseListenSpec } from './socket-transport.ts';
 
-import { loadConfig, isMainModule } from '@kakao-max/core';
+import { loadConfig, isMainModule } from '@kakao-mcp/core';
 
 export interface HealthResult {
   healthy: boolean;

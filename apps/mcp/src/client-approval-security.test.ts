@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions } from '@kakao-max/core';
+import { AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions } from '@kakao-mcp/core';
 import { ElicitationApprovals } from './client-approval.ts';
 
 function fixture(t: { after(fn: () => void): void }, action = 'send_media', enabled = true) {

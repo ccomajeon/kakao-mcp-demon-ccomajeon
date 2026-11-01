@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 
 const git = (...args) => execFileSync('git', args, { maxBuffer: 64 * 1024 * 1024 });
-const privateDirectory = /(?:^|\/)(?:\.kakao(?:-max)?|vault|downloads|secrets|rea)(?:\/|$)/i;
+const privateDirectory = /(?:^|\/)(?:\.kakao(?:-m(?:cp|ax))?|vault|downloads|secrets|rea)(?:\/|$)/i;
 const privateFile = /(?:^|\/)(?:\.env(?:\..*)?|.*\.(?:db|sqlite|sqlite3)(?:-.*)?|.*\.(?:pem|key|pcap|pcapng|har)|(?:messages\.jsonl|frames\.jsonl|friends\.json|known-chats\.json|credentials\.json|approvers\.json|approver-enroll\.json|auth-relogin\.json|install-state\.json).*)$/i;
 
 try {

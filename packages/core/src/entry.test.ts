@@ -15,6 +15,6 @@ test('a source checkout starts programs from TypeScript and names npm in message
 });
 
 test('the package layout starts dist bundles with plain node', () => {
-  assert.deepEqual(programArgs('connect', { packaged: true, root: '/opt/kakao-max' }), [path.join('/opt/kakao-max', 'dist', 'connect.mjs')]);
+  assert.deepEqual(programArgs('connect', { packaged: true, root: '/opt/kakao-mcp' }), [path.join('/opt/kakao-mcp', 'dist', 'connect.mjs')]);
   assert.deepEqual(programArgs('mcp', { packaged: true, relative: true }), ['dist/mcp.mjs']);
 });

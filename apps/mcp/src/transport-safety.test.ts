@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { McpStdioServer, MCP_LIMITS } from './mcp-stdio.ts';
-import { LocoError } from '@kakao-max/protocol';
+import { LocoError } from '@kakao-mcp/protocol';
 import { serveSocket, parseListenSpec, isNonLoopbackHost, validateListenSpec } from './socket-transport.ts';
 
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));

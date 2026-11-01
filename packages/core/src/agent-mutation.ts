@@ -1,6 +1,6 @@
 // Reviewed non-publication operations. Shares journal identity, claims and durable rate limits.
 import { WriteOperationEngine, type WriteDefinition } from './operation-engine.ts';
-import { parseEmoticonAttachment } from '@kakao-max/protocol';
+import { parseEmoticonAttachment } from '@kakao-mcp/protocol';
 import { AgentSendJournal, canonicalAgentJson, COMMIT_WINDOW_MS, type StoredApprovals, type ApprovalWindow } from './agent-send.ts';
 import { KakaoError } from './errors.ts';
 import type { SendPolicy, SendCategory } from './policy.ts';

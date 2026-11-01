@@ -2,7 +2,7 @@
 // when its package is installed, so a build without the folder simply has no such tools or operations.
 // A module adds tools in its own group, approved operations with their definitions, and approval labels.
 // It reaches account state only through the session's own policy paths (KakaoSession.extensionHost).
-import { KakaoError, registerReadGrantTool, type AgentOperationDefinition, type AgentOperationEngine, type AgentOperationEngineAdapter, type KakaoSession } from '@kakao-max/core';
+import { KakaoError, registerReadGrantTool, type AgentOperationDefinition, type AgentOperationEngine, type AgentOperationEngineAdapter, type KakaoSession } from '@kakao-mcp/core';
 import type { McpStdioServer } from './mcp-stdio.ts';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from './untrusted.ts';
 import { readGrant } from './read-grant.ts';

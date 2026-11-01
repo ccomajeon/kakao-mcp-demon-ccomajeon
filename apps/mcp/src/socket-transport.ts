@@ -21,7 +21,7 @@
 import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
-import { KakaoError, toKakaoError } from '@kakao-max/core';
+import { KakaoError, toKakaoError } from '@kakao-mcp/core';
 import type { McpStdioServer } from './mcp-stdio.ts';
 import { peerUid } from './peer-user.ts';
 

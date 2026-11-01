@@ -1,5 +1,5 @@
 // ----------------------------------------------------------------------------
-// The local account database: one SQLite file (~/.kakao-max/kakao.db, fallback ~/.kakao/kakao.db) holding
+// The local account database: one SQLite file (~/.kakao-mcp/kakao.db, fallback ~/.kakao/kakao.db) holding
 // messages, friends and known chats, opened with node:sqlite (no dependency).
 //
 // - Schema changes are numbered migrations recorded in `schema_migrations`;
@@ -276,7 +276,7 @@ export class KakaoDb {
 
   /**
    * Open (creating if needed) the database. `dir` defaults to KAKAO_DATA_DIR or
-   * ~/.kakao-max (fallback ~/.kakao); legacy files in that directory are imported on first open.
+   * ~/.kakao-mcp (fallback ~/.kakao); legacy files in that directory are imported on first open.
    */
   static open(opts: { dir?: string; file?: string; importLegacy?: boolean } = {}): KakaoDb {
     const dir = opts.dir ?? (opts.file ? path.dirname(opts.file) : loadConfig().dataDir);

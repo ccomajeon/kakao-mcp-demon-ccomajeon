@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ChannelMember, ChannelMeta } from '@kakao-max/protocol';
+import type { ChannelMember, ChannelMeta } from '@kakao-mcp/protocol';
 import { ChatRegistry } from './chat-registry.ts';
 import { KakaoDb } from './db.ts';
 import { KnownChats } from './known-chats.ts';

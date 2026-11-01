@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import { KakaoDb, RoomAccessPolicy, SendPolicy } from '@kakao-max/core';
+import { KakaoDb, RoomAccessPolicy, SendPolicy } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { registerCoreReadTools, saveDownload } from './tools/core-read.ts';
 

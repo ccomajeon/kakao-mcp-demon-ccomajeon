@@ -1,5 +1,5 @@
 {
-  "name": "@kakao-max/core",
+  "name": "@kakao-mcp/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,6 +10,6 @@
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "dependencies": {
-    "@kakao-max/protocol": "*"
+    "@kakao-mcp/protocol": "*"
   }
 }

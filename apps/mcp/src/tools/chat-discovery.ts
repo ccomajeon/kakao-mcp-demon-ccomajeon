@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { KakaoError, type KakaoSession } from '@kakao-max/core';
+import { KakaoError, type KakaoSession } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

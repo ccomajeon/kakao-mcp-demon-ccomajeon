@@ -63,9 +63,9 @@ function fixture(t: { after(fn: () => void): void }) {
 }
 test('managed update stops the old daemon before rebuilding, preserves credentials/journal and verifies the same account', async t => {
   const f = fixture(t); await updateManaged(f.host);
-  const stop = f.commands.findIndex(c => c === 'systemctl stop kakao-max.service');
+  const stop = f.commands.findIndex(c => c === 'systemctl stop kakao-mcp.service');
   const build = f.commands.findIndex(c => c.startsWith('runuser '));
-  const start = f.commands.findIndex(c => c === 'systemctl start kakao-max.service');
+  const start = f.commands.findIndex(c => c === 'systemctl start kakao-mcp.service');
   assert.ok(stop >= 0 && build > stop && start > build);
   assert.equal(fs.readFileSync(f.env, 'utf8'), f.credentials);
   assert.equal(fs.statSync(f.env).mode & 0o777, 0o600);
@@ -108,11 +108,11 @@ test('a failed build restores the pinned commit with its own dependencies and re
     assert.match(e.message, /previous version aaaaaaaaaaaa was restored and is running/);
     return true;
   });
-  const stop = f.commands.indexOf('systemctl stop kakao-max.service');
+  const stop = f.commands.indexOf('systemctl stop kakao-mcp.service');
   const install = f.commands.findIndex(c => c.startsWith('runuser ') && c.includes(' ci '));
   const restore = f.commands.findIndex(c => c.startsWith('git ') && c.endsWith(`checkout --detach ${f.old}`));
   const rebuild = f.commands.findIndex((c, i) => i > restore && c.startsWith('runuser ') && c.includes('tsc'));
-  const start = f.commands.indexOf('systemctl start kakao-max.service');
+  const start = f.commands.indexOf('systemctl start kakao-mcp.service');
   assert.ok(stop >= 0 && install > stop && restore > install && rebuild > restore && start > rebuild);
   assert.equal(f.commands.filter(c => c.startsWith('systemctl start')).length, 1, 'one start, no retry');
   assert.equal(f.commands.filter(c => c.includes(' ci ')).length, 1, 'the previous dependencies come back without a download');
@@ -146,7 +146,7 @@ test('when the previous version cannot be restored, the manifest records the fai
     assert.match(e.message, /update-managed\.ts --via-deploy b{40} "<reason>" --recover/);
     return true;
   });
-  assert.ok(!f.commands.includes('systemctl start kakao-max.service'), 'nothing started on an unverified app');
+  assert.ok(!f.commands.includes('systemctl start kakao-mcp.service'), 'nothing started on an unverified app');
   assert.equal(f.installed(), f.target, 'app is left at the attempted commit');
   assert.deepEqual(JSON.parse(fs.readFileSync(f.stateFile, 'utf8')), { version: 1, phase: 'configured', commit: f.old, port: 18787, pendingUpdate: f.target });
 
@@ -169,7 +169,7 @@ test('recovery of a failed update that fails to build again restores the previou
   f.failRestore(false); f.host.recover = true; f.commands.length = 0;
   await assert.rejects(updateManaged(f.host), /previous version aaaaaaaaaaaa was restored and is running/);
   assert.equal(f.installed(), f.old); assert.equal(f.active(), true);
-  assert.ok(f.commands.includes('systemctl reset-failed kakao-max.service'));
+  assert.ok(f.commands.includes('systemctl reset-failed kakao-mcp.service'));
   assert.equal(fs.readFileSync(path.join(f.app, 'node_modules', 'marker'), 'utf8'), 'old dependencies');
   assert.deepEqual(JSON.parse(fs.readFileSync(f.stateFile, 'utf8')), { version: 1, phase: 'running', commit: f.old, port: 18787 });
 });
@@ -191,9 +191,9 @@ test('explicit recovery deploys a stopped configured installation before startin
   await updateManaged(f.host);
   assert.equal(fs.readFileSync(f.env, 'utf8'), before);
   assert.equal(JSON.parse(fs.readFileSync(f.stateFile, 'utf8')).phase, 'running');
-  assert.ok(f.commands.includes('systemctl reset-failed kakao-max.service'));
+  assert.ok(f.commands.includes('systemctl reset-failed kakao-mcp.service'));
   const build = f.commands.findIndex(c => c.startsWith('runuser '));
-  const start = f.commands.findIndex(c => c === 'systemctl start kakao-max.service');
+  const start = f.commands.findIndex(c => c === 'systemctl start kakao-mcp.service');
   assert.ok(build >= 0 && start > build);
 });
 
@@ -231,7 +231,7 @@ function migrationFixture(t: { after(fn: () => void): void }) {
   fs.mkdirSync(legacyApp, { recursive: true }); fs.mkdirSync(legacyData); fs.mkdirSync(repo);
   const uid = process.getuid!() || 65000, gid = process.getgid!(), old = 'a'.repeat(40), target = 'b'.repeat(40);
   const legacyEnv = path.join(legacyApp, '.env.local');
-  const legacyUnitFile = path.join(parent, 'kakaotalk-mcp.service'), targetUnitFile = path.join(parent, 'kakao-max.service');
+  const legacyUnitFile = path.join(parent, 'kakaotalk-mcp.service'), targetUnitFile = path.join(parent, 'kakao-mcp.service');
   // Same keys setup-system writes, including the audit log inside the data dir.
   const credentials = `KAKAO_USER_ID=123456789\nKAKAO_ACCESS_TOKEN=fixture-token\nKAKAO_DATA_DIR=${legacyData}\nKAKAO_AUDIT_LOG=${legacyData}/audit.log\nKAKAO_MCP_LISTEN=127.0.0.1:18787\nKAKAO_MCP_ALLOWED_UIDS=1000\n`;
   fs.writeFileSync(legacyEnv, credentials, { mode: 0o600 }); fs.chownSync(legacyEnv, uid, gid); fs.chownSync(legacyData, uid, gid);
@@ -244,8 +244,8 @@ function migrationFixture(t: { after(fn: () => void): void }) {
   let userRenamed = false, groupRenamed = false;
   const targetApp = path.join(targetRoot, 'app');
   const host = {
-    root: targetRoot, legacyRoot, unitFile: targetUnitFile, legacyUnitFile, service: 'kakao-max', legacyService: 'kakaotalk-mcp',
-    repo, node: '/usr/bin/node', npm: '/usr/bin/npm', target, reason: 'migration to kakao-max',
+    root: targetRoot, legacyRoot, unitFile: targetUnitFile, legacyUnitFile, service: 'kakao-mcp', legacyService: 'kakaotalk-mcp',
+    repo, node: '/usr/bin/node', npm: '/usr/bin/npm', target, reason: 'migration to kakao-mcp',
     run: (program: string, args: string[]) => {
       commands.push(`${program} ${args.join(' ')}`);
       if (program === 'usermod') {
@@ -257,15 +257,15 @@ function migrationFixture(t: { after(fn: () => void): void }) {
         groupRenamed = true;
       }
       if (program === 'id') {
-        if (args.includes('kakao-max')) {
+        if (args.includes('kakao-mcp')) {
           if (userRenamed || userTaken) return String(args.includes('-u') ? uid : gid);
           return '';
         }
         return String(args[0] === '-u' ? uid : gid);
       }
       if (program === 'getent') {
-        if (args.includes('kakao-max')) {
-          if (groupRenamed || groupTaken) return `kakao-max:x:${gid}:`;
+        if (args.includes('kakao-mcp')) {
+          if (groupRenamed || groupTaken) return `kakao-mcp:x:${gid}:`;
           return '';
         }
         return '';
@@ -303,12 +303,12 @@ test('managed migration happy path: stops old unit, disables it, moves root, ren
 
   const stopOld = f.commands.findIndex(c => c === 'systemctl stop kakaotalk-mcp.service');
   const disableOld = f.commands.findIndex(c => c === 'systemctl disable kakaotalk-mcp.service');
-  const groupMod = f.commands.findIndex(c => c === 'groupmod -n kakao-max kakaotalk-mcp');
-  const userMod = f.commands.findIndex(c => c === 'usermod -l kakao-max kakaotalk-mcp');
+  const groupMod = f.commands.findIndex(c => c === 'groupmod -n kakao-mcp kakaotalk-mcp');
+  const userMod = f.commands.findIndex(c => c === 'usermod -l kakao-mcp kakaotalk-mcp');
   const reload = f.commands.findIndex(c => c === 'systemctl daemon-reload');
-  const enableNew = f.commands.findIndex(c => c === 'systemctl enable kakao-max.service');
-  const build = f.commands.findIndex(c => c.startsWith('runuser -u kakao-max'));
-  const startNew = f.commands.findIndex(c => c === 'systemctl start kakao-max.service');
+  const enableNew = f.commands.findIndex(c => c === 'systemctl enable kakao-mcp.service');
+  const build = f.commands.findIndex(c => c.startsWith('runuser -u kakao-mcp'));
+  const startNew = f.commands.findIndex(c => c === 'systemctl start kakao-mcp.service');
 
   assert.ok(stopOld >= 0, 'old unit was stopped');
   assert.ok(disableOld > stopOld, 'old unit was disabled after stop');
@@ -375,12 +375,12 @@ test('migration refuses when both legacy and target unit files exist, stopping n
 test('migration refuses when target user or group already exists, stopping nothing', async t => {
   const fUser = migrationFixture(t);
   fUser.userTaken();
-  await assert.rejects(updateManaged(fUser.host), (e: Error) => /Target user kakao-max already exists/.test(e.message));
+  await assert.rejects(updateManaged(fUser.host), (e: Error) => /Target user kakao-mcp already exists/.test(e.message));
   assert.ok(!fUser.commands.some(c => c.startsWith('systemctl stop')), 'nothing stopped');
 
   const fGroup = migrationFixture(t);
   fGroup.groupTaken();
-  await assert.rejects(updateManaged(fGroup.host), (e: Error) => /Target group kakao-max already exists/.test(e.message));
+  await assert.rejects(updateManaged(fGroup.host), (e: Error) => /Target group kakao-mcp already exists/.test(e.message));
   assert.ok(!fGroup.commands.some(c => c.startsWith('systemctl stop')), 'nothing stopped');
 });
 
@@ -408,7 +408,7 @@ test('migration failure at build after full migration advises recover-managed-mc
     return true;
   });
   assert.ok(f.commands.includes('systemctl stop kakaotalk-mcp.service'), 'old unit was stopped');
-  assert.ok(!f.commands.includes('systemctl start kakao-max.service'), 'new unit was not started');
+  assert.ok(!f.commands.includes('systemctl start kakao-mcp.service'), 'new unit was not started');
   assert.ok(!f.commands.includes('systemctl start kakaotalk-mcp.service'), 'old unit was not restarted (no concurrent or blind restarts)');
 
   // The advised --recover accepts the app at the attempted commit and finishes, without a saved password.
@@ -416,7 +416,7 @@ test('migration failure at build after full migration advises recover-managed-mc
   assert.equal(JSON.parse(fs.readFileSync(stateFile, 'utf8')).pendingUpdate, f.host.target);
   f.failBuild(false);
   await updateManaged({ ...f.host, recover: true });
-  assert.ok(f.commands.includes('systemctl start kakao-max.service'));
+  assert.ok(f.commands.includes('systemctl start kakao-mcp.service'));
   assert.deepEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')), { version: 1, phase: 'running', commit: f.host.target, port: 18787 });
 });
 
@@ -440,7 +440,7 @@ test('migration failure right after disable advises sudo systemctl enable --now 
   });
   assert.ok(f.commands.includes('systemctl stop kakaotalk-mcp.service'), 'old unit was stopped');
   assert.ok(f.commands.includes('systemctl disable kakaotalk-mcp.service'), 'old unit was disabled');
-  assert.ok(!f.commands.includes('systemctl start kakao-max.service'), 'new unit was not started');
+  assert.ok(!f.commands.includes('systemctl start kakao-mcp.service'), 'new unit was not started');
   assert.ok(!f.commands.includes('systemctl start kakaotalk-mcp.service'), 'old unit was not restarted');
 });
 
@@ -449,17 +449,17 @@ test('migration failure during usermod after root rename stops daemon and lists 
   f.failUsermod();
   await assert.rejects(updateManaged(f.host), (e: any) => {
     assert.equal(e.code, 'STORAGE_UNSAFE');
-    assert.match(e.message, /Migration halted at "usermod -l kakao-max kakaotalk-mcp"/);
+    assert.match(e.message, /Migration halted at "usermod -l kakao-mcp kakaotalk-mcp"/);
     assert.match(e.message, /Completed: \[.*rename root directory.*\]/);
     assert.match(e.message, /Root was moved to/);
-    assert.match(e.message, /sudo usermod -l kakao-max kakaotalk-mcp/);
+    assert.match(e.message, /sudo usermod -l kakao-mcp kakaotalk-mcp/);
     assert.ok(!e.message.includes('sudo groupmod'), 'completed groupmod is not listed');
     return true;
   });
   assert.equal(fs.existsSync(f.targetRoot), true, 'target root directory exists because move completed');
   assert.equal(fs.existsSync(f.legacyRoot), false, 'legacy root was moved');
   assert.ok(f.commands.includes('systemctl stop kakaotalk-mcp.service'), 'old unit was stopped');
-  assert.ok(!f.commands.includes('systemctl start kakao-max.service'), 'new unit was not started');
+  assert.ok(!f.commands.includes('systemctl start kakao-mcp.service'), 'new unit was not started');
   assert.ok(!f.commands.includes('systemctl start kakaotalk-mcp.service'), 'old unit was not restarted');
 });
 
@@ -468,8 +468,8 @@ test('migration failure during groupmod lists both groupmod and usermod', async 
   f.failGroupmod();
   await assert.rejects(updateManaged(f.host), (e: any) => {
     assert.equal(e.code, 'STORAGE_UNSAFE');
-    assert.match(e.message, /Migration halted at "groupmod -n kakao-max kakaotalk-mcp"/);
-    assert.match(e.message, /sudo groupmod -n kakao-max kakaotalk-mcp && sudo usermod -l kakao-max kakaotalk-mcp/);
+    assert.match(e.message, /Migration halted at "groupmod -n kakao-mcp kakaotalk-mcp"/);
+    assert.match(e.message, /sudo groupmod -n kakao-mcp kakaotalk-mcp && sudo usermod -l kakao-mcp kakaotalk-mcp/);
     return true;
   });
 });
@@ -487,5 +487,5 @@ test('migration failure if credentials in .env.local are modified beyond KAKAO_D
     return originalRun(program, args);
   };
   await assert.rejects(updateManaged(f.host), { code: 'STORAGE_UNSAFE' });
-  assert.ok(!f.commands.includes('systemctl start kakao-max.service'), 'new unit was not started');
+  assert.ok(!f.commands.includes('systemctl start kakao-mcp.service'), 'new unit was not started');
 });

@@ -1,5 +1,5 @@
 import { readGrant } from '../read-grant.ts';
-import type { KakaoSession } from '@kakao-max/core';
+import type { KakaoSession } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 

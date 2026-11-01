@@ -39,7 +39,7 @@ function fixture(t: { after(fn: () => void): void }) {
         if (args.includes('status')) return dirty ? ' M file.ts' : '';
         if (args.includes('clone')) fs.mkdirSync(path.join(root, 'app'));
       }
-      if (program === 'getent') return user ? `kakao-max:x:${uid}:${gid}::/var/lib/kakao-max:/usr/sbin/nologin` : '';
+      if (program === 'getent') return user ? `kakao-mcp:x:${uid}:${gid}::/var/lib/kakao-mcp:/usr/sbin/nologin` : '';
       if (program === 'useradd') user = true;
       if (program === 'id') return String(args[0] === '-u' ? uid : gid);
       if (program === 'runuser' && args.some(v => v.endsWith('/tsc')) && failBuild) { failBuild = false; throw new Error('fixture build failure'); }
@@ -81,7 +81,7 @@ test('new Linux bootstrap pins Git, isolates code/data, starts only after confir
   assert.ok(f.commands.some(c => c.program === 'git' && c.args.includes('--no-local')));
   assert.ok(f.commands.some(c => c.program === 'git' && c.args.includes('--detach') && c.args.includes(COMMIT)));
   assert.equal(fs.statSync(f.root).mode & 0o777, 0o755);
-  assert.ok(f.commands.some(c => c.program === 'chown' && c.args.includes('root:kakao-max')));
+  assert.ok(f.commands.some(c => c.program === 'chown' && c.args.includes('root:kakao-mcp')));
   assert.ok(f.commands.some(c => c.program === 'chmod' && c.args.includes('u=rwX,g=rX,o=')));
   assert.ok(f.commands.some(c => c.program === 'runuser' && c.args.includes('--cache')));
   assert.ok(!fs.existsSync(path.join(f.root, 'build-cache')));
@@ -203,7 +203,7 @@ test('unhealthy startup is reported as failure without an automatic login or res
 
 test('systemd paths are quoted with specifier/variable escaping and the service cannot write its code', () => {
   const unit = serviceUnit('/var/lib/fixture app', '/var/lib/fixture data', '/usr/bin/node');
-  assert.match(unit, /User=kakao-max/); assert.match(unit, /ProtectSystem=strict/); assert.match(unit, /ProtectHome=true/);
+  assert.match(unit, /User=kakao-mcp/); assert.match(unit, /ProtectSystem=strict/); assert.match(unit, /ProtectHome=true/);
   assert.match(unit, /WorkingDirectory=\/var\/lib\/fixture app\n/);
   assert.match(unit, /ReadWritePaths="\/var\/lib\/fixture data" "\/var\/lib\/fixture app\/\.env.local"/);
   assert.match(serviceUnit('/var/lib/app', '/var/lib/data', '/usr/bin/%node/$name'), /%%node\/\$\$name/);

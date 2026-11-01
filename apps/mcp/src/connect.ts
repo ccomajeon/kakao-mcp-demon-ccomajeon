@@ -3,7 +3,7 @@
 import net from 'node:net';
 import fs from 'node:fs';
 import type { Readable, Writable } from 'node:stream';
-import { KakaoError, isMainModule, setupCommand } from '@kakao-max/core';
+import { KakaoError, isMainModule, setupCommand } from '@kakao-mcp/core';
 import { reconnectingBridge } from './reconnecting-bridge.ts';
 import { openDaemon, validateConnection, type ConnectionOptions } from './daemon-connection.ts';
 import { parseListenSpec, validateListenSpec } from './socket-transport.ts';

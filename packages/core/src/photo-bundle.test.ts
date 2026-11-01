@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LocoError } from '@kakao-max/protocol';
+import { LocoError } from '@kakao-mcp/protocol';
 import { toKakaoError } from './errors.ts';
 import { preparePhotoBundle } from './photo-bundle.ts';
 

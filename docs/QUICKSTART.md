@@ -1,4 +1,4 @@
-# kakao-max 시작하기
+# kakao-mcp 시작하기
 
 Linux 서버의 데몬 하나가 카카오톡 계정을 유지하고, AI 클라이언트는 그 데몬에 연결합니다. 새 AI 대화를 열 때마다 계정에 다시 로그인하지 않습니다.
 
@@ -23,9 +23,9 @@ npm run setup
 
 ## 2. AI를 쓰는 컴퓨터에서 연결
 
-그 컴퓨터에 kakao-max를 설치합니다. `npm install -g kakao-max`, macOS는 `brew install ziesski/tap/kakao-max`, Windows는 Scoop의 `ziesski/scoop-bucket`에서 설치할 수 있습니다([README](../README.md#getting-started)). 그다음 `kakao-max setup`(Git 체크아웃에서는 `npm run setup`)을 실행하고 `기존 데몬 연결`을 선택합니다. SSH 대상과 설치 때 선택한 서버 loopback 주소/포트를 입력합니다. SSH 대상은 `operator@server` 또는 자신의 SSH 별칭입니다. 공개 네트워크에 MCP 포트를 열 필요는 없습니다.
+그 컴퓨터에 `kakao-mcp-ccomajeon` 패키지를 설치합니다. [README의 설치와 사용법](../README.md#설치와-사용법)에 따라 소스에서 `.tgz` 파일을 만들고 전역 설치하세요. 그다음 `kakao-mcp setup`(Git 체크아웃에서는 `npm run setup`)을 실행하고 `기존 데몬 연결`을 선택합니다. SSH 대상과 설치 때 선택한 서버 loopback 주소/포트를 입력합니다. SSH 대상은 `operator@server` 또는 자신의 SSH 별칭입니다. 공개 네트워크에 MCP 포트를 열 필요는 없습니다.
 
-마법사가 연결을 진단하고 MCP 설정을 출력합니다. Claude Code와 Codex는 함께 출력되는 `claude mcp add …`·`codex mcp add …` 한 줄을 그대로 실행하면 되고, 그 밖의 클라이언트는 출력한 JSON을 그 클라이언트의 MCP 설정에 등록합니다. 새 설정 키는 `kakao-max`이며 기존 사용자의 `kakaotalk` 키 설정도 그대로 계속 동작합니다. 클라이언트 설정은 허락 없이 덮어쓰지 않습니다.
+마법사가 연결을 진단하고 MCP 설정을 출력합니다. Claude Code와 Codex는 함께 출력되는 `claude mcp add …`·`codex mcp add …` 한 줄을 그대로 실행하면 되고, 그 밖의 클라이언트는 출력한 JSON을 그 클라이언트의 MCP 설정에 등록합니다. 새 설정 키는 `kakao-mcp`이며 기존 사용자의 `kakaotalk` 키 설정도 그대로 계속 동작합니다. 클라이언트 설정은 허락 없이 덮어쓰지 않습니다.
 
 새 설정은 로컬 Node 커넥터를 사용합니다. 이 커넥터가 SSH/TCP 연결만 복구하므로, 데몬이 재시작되어도 클라이언트 stdio를 유지합니다. MCP 초기화 이외의 작업·승인 응답은 자동 재실행하지 않습니다. 기존 `ssh -W` 직접 연결 설정은 다시 생성해야 이 동작을 사용할 수 있습니다.
 
@@ -49,7 +49,7 @@ AI에 예를 들어 “프로젝트 방의 오늘 대화를 요약해서 결과�
 
 MCP 포트는 서버 밖에서 접속할 수 없고(loopback), Linux에서는 허용한 OS 사용자의 연결만 받습니다. 설치 마법사가 `sudo`로 설치한 사람의 계정을 `KAKAO_MCP_ALLOWED_UIDS`에 기록하므로, 그 계정으로 들어오는 SSH 터널은 그대로 동작합니다. 다른 계정으로 연결하려면 그 계정의 uid(`id -u`)를 쉼표로 덧붙입니다. 데몬 자신의 계정과 root는 항상 허용합니다. 이전 버전으로 설치한 서버는 업데이트 전에 이 줄을 추가해야 하며, 없으면 업데이트가 데몬을 멈추기 전에 알리고 중단합니다.
 
-**macOS·Windows에는 이 확인이 없습니다.** 데몬을 TCP(`127.0.0.1:PORT`)로 열면 그 컴퓨터의 모든 OS 사용자와 프로그램이 접속해 계정을 쓸 수 있고, 클라이언트 확인 창에 스스로 답할 수도 있습니다. 데몬은 시작할 때 이 경고를 출력합니다. 나만 쓰는 컴퓨터에서만 실행하세요. macOS에서는 TCP 대신 나만 접근할 수 있는 폴더(권한 0700)의 Unix 소켓(`KAKAO_MCP_LISTEN=/경로/kakao-max.sock`)을 쓰면 다른 사용자를 막을 수 있습니다. Windows는 Unix 소켓을 지원하지 않으므로 공용·다중 사용자 PC에서는 실행하지 마세요.
+**macOS·Windows에는 이 확인이 없습니다.** 데몬을 TCP(`127.0.0.1:PORT`)로 열면 그 컴퓨터의 모든 OS 사용자와 프로그램이 접속해 계정을 쓸 수 있고, 클라이언트 확인 창에 스스로 답할 수도 있습니다. 데몬은 시작할 때 이 경고를 출력합니다. 나만 쓰는 컴퓨터에서만 실행하세요. macOS에서는 TCP 대신 나만 접근할 수 있는 폴더(권한 0700)의 Unix 소켓(`KAKAO_MCP_LISTEN=/경로/kakao-mcp.sock`)을 쓰면 다른 사용자를 막을 수 있습니다. Windows는 Unix 소켓을 지원하지 않으므로 공용·다중 사용자 PC에서는 실행하지 마세요.
 
 ## AI 클라이언트 호환
 
@@ -59,7 +59,7 @@ MCP 포트는 서버 밖에서 접속할 수 없고(loopback), Linux에서는 �
 |---|---|---|
 | Claude Code 터미널(CLI) 2.1.308 | 표시하고 코드 입력으로 승인 | ✅ 2026-10-25 실계정 |
 | Claude 데스크톱 앱 Code 탭 | 창 없이 자동 거절 | ✅ 2026-10-25 실계정 (승인 필요 작업 불가) |
-| kakao-max 웹 화면(`apps/web`) | 브라우저에 표시하고 코드 입력으로 승인 | 🟡 fixture 데몬·브라우저 (실계정 미확인) |
+| kakao-mcp 웹 화면(`apps/web`) | 브라우저에 표시하고 코드 입력으로 승인 | 🟡 fixture 데몬·브라우저 (실계정 미확인) |
 | 그 밖의 클라이언트 | 미확인 | ❓ |
 
 확인 창 없이 쓰려면 패스키 승인 페이지를 설정합니다.

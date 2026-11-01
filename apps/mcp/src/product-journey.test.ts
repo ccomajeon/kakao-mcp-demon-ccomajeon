@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { randomUUID } from 'node:crypto';
-import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy } from '@kakao-max/core';
+import { AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, DailyActionLimit, KakaoDb, RecipientPermissions, RoomAccessPolicy, SendPolicy } from '@kakao-mcp/core';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { ElicitationApprovals } from './client-approval.ts';
 import { registerAgentMessageTools } from './tools/agent-messages.ts';
@@ -19,7 +19,7 @@ import { registerNamedOperationTools, grantViews } from './tools/agent-operation
 import { registerChatTools } from './tools/chats.ts';
 import { registerFriendsTools } from './tools/friends.ts';
 import { registerMessageInboxTools } from './tools/message-inbox.ts';
-import { loadConfig, type ReadApproval } from '@kakao-max/core';
+import { loadConfig, type ReadApproval } from '@kakao-mcp/core';
 import { runSetup } from './setup.ts';
 
 const SOURCE = '123456789', DEST = '987654321';

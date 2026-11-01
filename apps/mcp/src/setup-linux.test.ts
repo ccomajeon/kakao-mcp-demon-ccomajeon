@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import type net from 'node:net';
-import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, SendPolicy } from '@kakao-max/core';
+import { AgentSendJournal, AgentSendService, ApprovalStore, ApproverRegistry, SendPolicy } from '@kakao-mcp/core';
 import { bootstrapLocal, serviceUnit } from './setup-system.ts';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { ElicitationApprovals } from './client-approval.ts';
@@ -51,8 +51,8 @@ if (process.argv.includes('--serve-ssh-fixture')) {
   test('Linux systemd validates the production unit and enforces code/data isolation in a temporary non-networked fixture',
     { skip: !process.argv.includes('--linux-os-fixture') }, async t => {
       assert.equal(process.platform, 'linux'); assert.equal(process.getuid?.(), 0);
-      const root = fs.mkdtempSync('/run/kakao-max-verify-'), app = path.join(root, 'app'), data = path.join(root, 'data');
-      const unit = `kakao-max-verify-${randomUUID()}.service`;
+      const root = fs.mkdtempSync('/run/kakao-mcp-verify-'), app = path.join(root, 'app'), data = path.join(root, 'data');
+      const unit = `kakao-mcp-verify-${randomUUID()}.service`;
       const role = `ktmcpv-${randomBytes(5).toString('hex')}`;
       let created = false;
       t.after(() => {
@@ -87,7 +87,7 @@ assert.throws(() => fs.readFileSync(secret), {code:'EACCES'});
       // Match the installer's permissions even with umask 077 in the remote verification shell.
       checked('chown', ['-R', `root:${role}`, app]); checked('chmod', ['-R', 'u=rwX,g=rX,o=', app]);
       fs.chownSync(env, uid, gid); fs.chmodSync(env, 0o600);
-      const generated = serviceUnit(app, data, process.execPath).replace(/^User=kakao-max$/m, `User=${role}`).replace(/^Group=kakao-max$/m, `Group=${role}`);
+      const generated = serviceUnit(app, data, process.execPath).replace(/^User=kakao-mcp$/m, `User=${role}`).replace(/^Group=kakao-mcp$/m, `Group=${role}`);
       const unitFile = path.join(root, unit); fs.writeFileSync(unitFile, generated);
       checked('systemd-analyze', ['verify', unitFile]);
       checked('systemd-run', ['--quiet', '--wait', '--collect', `--unit=${unit}`, '--property=Type=exec', `--property=User=${role}`,
@@ -104,8 +104,8 @@ assert.throws(() => fs.readFileSync(secret), {code:'EACCES'});
   test('Linux real Git/npm/service-user bootstrap reaches configured state with injected registration and no daemon start',
     { skip: !process.argv.includes('--linux-os-fixture') || !process.argv.includes('--published-main-fixture'), timeout: 120000 }, async t => {
       assert.equal(process.platform, 'linux'); assert.equal(process.getuid?.(), 0);
-      const parent = fs.mkdtempSync('/run/kakao-max-build-'); fs.chmodSync(parent, 0o755);
-      const role = `kakao-max-${randomBytes(4).toString('hex')}`, root = path.join(parent, 'managed');
+      const parent = fs.mkdtempSync('/run/kakao-mcp-build-'); fs.chmodSync(parent, 0o755);
+      const role = `kakao-mcp-${randomBytes(4).toString('hex')}`, root = path.join(parent, 'managed');
       const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
       let created = false, registrations = 0;
       t.after(() => {
