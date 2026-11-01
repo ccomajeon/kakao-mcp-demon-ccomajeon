@@ -1,0 +1,61 @@
+{
+  "name": "kakao-mcp-ccomajeon",
+  "version": "0.2.0-rebuild.2",
+  "description": "Unofficial headless KakaoTalk account daemon and MCP server for AI agents",
+  "license": "MIT",
+  "author": "ziesski",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon.git"
+  },
+  "homepage": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon#readme",
+  "bugs": {
+    "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon/issues"
+  },
+  "keywords": [
+    "kakaotalk",
+    "mcp",
+    "mcp-server",
+    "ai-agents",
+    "self-hosted"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "kakao-mcp-ccomajeon": "dist/cli.mjs",
+    "kakao-mcp-ccomajeon-mcp": "dist/mcp.mjs",
+    "kakao-mcp-ccomajeon-web": "dist/web.mjs",
+    "kakao-max": "dist/cli.mjs",
+    "kakao-max-mcp": "dist/mcp.mjs",
+    "kakao-max-web": "dist/web.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "check:publication": "node scripts/check-publication.mjs",
+    "check:private-terms": "node scripts/check-private-terms.mjs --tree HEAD",
+    "pretest": "npm run build --workspace=@kakao-max/protocol",
+    "test": "node --test scripts/check-private-terms.test.mjs && npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "build:package": "node scripts/build-package.mjs",
+    "check:package": "node scripts/check-package.mjs",
+    "kakao": "node --experimental-strip-types apps/cli/src/index.ts",
+    "kakao-max": "node --experimental-strip-types apps/cli/src/index.ts",
+    "web": "node --experimental-strip-types apps/web/src/index.ts",
+    "presetup": "npm run build --workspace=@kakao-max/protocol",
+    "setup": "node --experimental-strip-types apps/mcp/src/setup.ts",
+    "typecheck": "npm run build --workspace=@kakao-max/protocol && tsc -p packages/core/tsconfig.json && tsc -p apps/mcp/tsconfig.json && tsc -p packages/client/tsconfig.json && tsc -p apps/cli/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "prepare": "node -e \"try{require('node:child_process').execFileSync('git',['config','core.hooksPath','.githooks'],{stdio:'ignore'})}catch{}\"",
+    "prepack": "npm run build:package",
+    "kakao-mcp-ccomajeon": "node --experimental-strip-types apps/cli/src/index.ts"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
