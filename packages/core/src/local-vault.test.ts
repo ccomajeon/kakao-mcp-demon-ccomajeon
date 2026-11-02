@@ -70,6 +70,30 @@ test('extractScheduleAndTodos extracts appointments and actionable tasks', () =>
   assert.equal(result.todos[1].task, '배포 준비 완료');
 });
 
+test('extractScheduleAndTodos stays linear on hostile received text', () => {
+  const hostile = [
+    'x' + ' '.repeat(5000) + 'x',
+    ('x' + ' '.repeat(404) + 'x\n').repeat(20),
+    ' \t'.repeat(4000) + '1',
+    '내일 '.repeat(500) + '오후 '.repeat(500) + '월요일 '.repeat(500),
+    '12월 '.repeat(2000),
+    '역 '.repeat(4000) + '에',
+    ('가'.repeat(39) + '하기 ').repeat(300),
+    '-' + ' '.repeat(5000) + 'x',
+    '1'.repeat(20000)
+  ];
+  for (const text of hostile) {
+    const started = performance.now();
+    extractScheduleAndTodos([{ messageId: '1', chatId: '100', text, sendAt: 0 }]);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 100, `extraction took ${elapsed.toFixed(1)} ms for a ${text.length}-character message`);
+  }
+  // Ordinary spacing still links the date, period and time; whitespace runs count as one space.
+  const spaced = extractScheduleAndTodos([{ messageId: '1', chatId: '100', text: '다음주   금요일  오전 10시 30분   강남역   스타벅스에서 회의', sendAt: 0 }]);
+  assert.equal(spaced.schedules[0].timeHint, '다음주 금요일 오전 10시 30분');
+  assert.equal(spaced.schedules[0].locationHint, '강남역 스타벅스');
+});
+
 test('LocalVault exports chat history into fixed vault/exports/ directory', t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-test-'));
   const db = KakaoDb.open({ dir });

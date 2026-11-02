@@ -44,6 +44,8 @@ function deletedLogIdOf(notice: IncomingMessage | undefined): string | undefined
 
 /** LOCO message types of emoticons (6 EMOTICON, 12 STICKER, 20 STICKER_ANI, 22 SCON, 25 XCON). */
 const EMOTICON_TYPES: ReadonlySet<number> = new Set([6, 12, 20, 22, 25]);
+/** Agent media travels as base64 inside MCP JSON; see docs/designs/agent-mode-and-layers.md. */
+const AGENT_MEDIA_MAX_BYTES = 16 * 1024 * 1024;
 import { RoomAccessPolicy, type ReadApproval, type ReadGrantRef, type ReadGrantTool } from './room-access.ts';
 import { CredentialStore } from './credentials.ts';
 import { preparePhotoBundle } from './photo-bundle.ts';
@@ -665,6 +667,11 @@ export class KakaoSession {
     if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) throw new KakaoError('INVALID_ARGUMENT', 'Stored media attachment is invalid');
     const tokens = [attachment.k, attachment.tk, attachment.tkh, ...(Array.isArray(attachment.kl) ? attachment.kl : [])];
     if (!tokens.includes(opts.token)) throw new KakaoError('POLICY_DENIED', 'Media token does not belong to the selected message');
+    // The agent path returns the bytes inside MCP JSON as base64, so it keeps the 16 MiB design limit.
+    const size = attachment.s ?? attachment.size;
+    if (!opts.isMini && opts.token === attachment.k && typeof size === 'number' && size > AGENT_MEDIA_MAX_BYTES) {
+      throw new KakaoError('INVALID_ARGUMENT', 'Attachment is larger than the 16 MiB agent download limit');
+    }
     const result = await this.session.downloadMedia(chatId, {
       userId: this.selfUserId,
       token: opts.token,
@@ -673,7 +680,8 @@ export class KakaoSession {
       isMini: opts.isMini,
       width: opts.width,
       height: opts.height,
-      timeoutMs: opts.timeoutMs
+      timeoutMs: opts.timeoutMs,
+      maxBytes: AGENT_MEDIA_MAX_BYTES
     });
     try { check(); return result; }
     catch (error) { result.data.fill(0); throw error; }
@@ -894,11 +902,18 @@ export class KakaoSession {
     return { updated, source: 'server' };
   }
 
+  /** Most live messages one recent/wait call returns: the room limit, and a one-time grant's size when one is used. */
+  liveReadLimit(chatId: string, approval: ReadApproval = {}): number {
+    const ruleMax = this.roomAccess.rule(chatId).maxMessages ?? 50;
+    const grantMax = approval.readGrant?.id ? this.roomAccess.readGrant(approval.readGrant.id)?.maxMessages : undefined;
+    return Math.min(grantMax ?? ruleMax, ruleMax);
+  }
+
   /** Messages received after `sinceSeq` (exclusive), optionally filtered to one chat. */
   async recentMessages(sinceSeq = 0, chatId?: string, approval: ReadApproval = {}): Promise<BufferedMessage[]> {
     if (!chatId) throw new KakaoError('POLICY_DENIED', 'Select one room for message polling; cross-room content polling is blocked');
     const check = await this.beginContentRead(chatId, approval);
-    const max = this.roomAccess.rule(chatId).maxMessages ?? 50;
+    const max = this.liveReadLimit(chatId, approval);
     const result = this.withoutHiddenOrDeleted(this.feed.recent(sinceSeq, chatId)).slice(0, max).map(m => this.named(m));
     check();
     return result;
@@ -966,7 +981,7 @@ export class KakaoSession {
     // The rule may have narrowed while waiting. No second budget slot.
     this.requireConnected();
     check();
-    return this.withoutHiddenOrDeleted(result).slice(0, this.roomAccess.rule(chatId).maxMessages ?? 50).map(m => this.named(m));
+    return this.withoutHiddenOrDeleted(result).slice(0, this.liveReadLimit(chatId, approval)).map(m => this.named(m));
   }
 
   /** Drop feed entries the user hid ("delete for me") or that were deleted ("delete for all"). */

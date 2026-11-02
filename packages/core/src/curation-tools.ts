@@ -155,6 +155,9 @@ export function collectSharedLinks(
   };
 }
 
+/** Only this much of each line is scanned for hints; received text can be arbitrarily long. */
+const MAX_SCAN_LINE = 500;
+
 /**
  * Parse messages to extract appointments, dates, times, and todo action items.
  */
@@ -171,11 +174,14 @@ export function extractScheduleAndTodos(
   const schedules: ExtractedScheduleItem[] = [];
   const todos: ExtractedTodoItem[] = [];
 
-  const timePattern = /(오늘|내일|모레|이번주|다음주)?\s*([월화수목금토일]요일)?\s*(\d{1,2}월\s*\d{1,2}일|\d{4}[-.]\d{1,2}[-.]\d{1,2})?\s*(오전|오후|저녁|아침|점심|새벽)?\s*(\d{1,2}시(?:\s*\d{1,2}분)?|\d{1,2}:\d{2})/i;
-  const locationPattern = /([가-힣a-zA-Z0-9_\s]{2,15}(?:역|점|앞|스타벅스|카페|식당|회의실|사무실|로비|빌딩))\s*(에서|앞에서|위치)/;
+  // Remote text feeds every pattern below, so each one is linear: whitespace between optional
+  // parts is a single collapsed space and every repeated part has a fixed upper bound.
+  const timePattern = /(오늘|내일|모레|이번주|다음주)?\s?([월화수목금토일]요일)?\s?(\d{1,2}월\s?\d{1,2}일|\d{4}[-.]\d{1,2}[-.]\d{1,2})?\s?(오전|오후|저녁|아침|점심|새벽)?\s?(\d{1,2}시(?:\s?\d{1,2}분)?|\d{1,2}:\d{2})/i;
+  const locationPattern = /([가-힣a-zA-Z0-9_\s]{2,15}(?:역|점|앞|스타벅스|카페|식당|회의실|사무실|로비|빌딩))\s?(에서|앞에서|위치)/;
 
+  // Anchored, and the trailing (.*) always succeeds, so its whitespace runs cannot backtrack quadratically.
   const todoPrefixPattern = /^(?:-\s*\[([ xX])\]|\*\s*\[([ xX])\]|(?:\d+\.|\*|-|•)\s*(?:TODO|투두|할일|준비물|과제|확인|체크)?[:\s]+)(.*)/i;
-  const todoVerbPattern = /([가-힣a-zA-Z0-9_\s]{3,40}(?:하기|보내기|확인하기|제출하기|작성하기|수정하기|배포하기|정리하기|체크하기|전달하기|공유하기))(?:\s*부탁|\s*요청|\s*필요|[!.]|$)/;
+  const todoVerbPattern = /([가-힣a-zA-Z0-9_\s]{3,40}(?:하기|보내기|확인하기|제출하기|작성하기|수정하기|배포하기|정리하기|체크하기|전달하기|공유하기))(?:\s?부탁|\s?요청|\s?필요|[!.]|$)/;
 
   for (const m of messages) {
     if (!m.text) continue;
@@ -184,12 +190,15 @@ export function extractScheduleAndTodos(
     for (const rawLine of lines) {
       const line = rawLine.trim();
       if (!line) continue;
+      // Hints come from the start of a line; whitespace runs count as one space.
+      const head = line.slice(0, MAX_SCAN_LINE);
+      const text = head.replace(/\s+/g, ' ');
 
       // 1. Schedule Detection
-      const timeMatch = line.match(timePattern);
+      const timeMatch = text.match(timePattern);
       if (timeMatch) {
-        const remaining = line.replace(timeMatch[0], '').trim();
-        const locMatch = remaining.match(locationPattern) ?? line.match(locationPattern);
+        const remaining = text.replace(timeMatch[0], '').trim();
+        const locMatch = remaining.match(locationPattern) ?? text.match(locationPattern);
         schedules.push({
           messageId: m.messageId,
           chatId: m.chatId,
@@ -202,11 +211,11 @@ export function extractScheduleAndTodos(
       }
 
       // 2. Todo Detection
-      const prefixMatch = line.match(todoPrefixPattern);
+      const prefixMatch = head.match(todoPrefixPattern);
       if (prefixMatch) {
         const isBox = prefixMatch[1] ?? prefixMatch[2];
         const isDone = isBox ? isBox.toLowerCase() === 'x' : false;
-        const taskText = (prefixMatch[3] ?? line).trim();
+        const taskText = (prefixMatch[3] ?? head).trim();
         if (taskText.length >= 2) {
           todos.push({
             messageId: m.messageId,
@@ -220,7 +229,7 @@ export function extractScheduleAndTodos(
         }
       }
 
-      const verbMatch = line.match(todoVerbPattern);
+      const verbMatch = text.match(todoVerbPattern);
       if (verbMatch) {
         todos.push({
           messageId: m.messageId,
