@@ -12,7 +12,7 @@ import { parseWebArgs, describeEndpoint, sshOpener, WEB_USAGE, type DaemonEndpoi
 import { fetchOg, type OgPreview } from './og.ts';
 // Only the program-location helper: the GUI never loads the account core.
 import { packagedEntry } from '../../../packages/core/src/entry.ts';
-import { localRequestProblem, createLaunchSecret, hasSession, matchesSecret, sessionCookie } from './http-security.ts';
+import { localRequestProblem, createLaunchSecret, hasSession, hasApiToken, matchesSecret, sessionCookie, launchLocation, SECURITY_HEADERS } from './http-security.ts';
 
 // ----------------------------------------------------------------------------
 // Local, single-account web GUI: a client of the running kakao-mcp daemon's MCP
@@ -27,6 +27,10 @@ const WEB_DIR = path.resolve(__dirname, packagedEntry() ? 'web-public' : '../pub
 const PORT = Number(process.env.PORT || 8899);
 // Shown only on the person's terminal; see http-security.ts.
 const LAUNCH_SECRET = createLaunchSecret();
+// Separate secrets, handed out only by the launch link: the cookie opens the page, the token (held by
+// the page's script) opens the API. A cookie sent to another local port reveals neither of the others.
+const PAGE_SECRET = createLaunchSecret();
+const API_TOKEN = createLaunchSecret();
 
 const ogCache = new Map<string, { preview: OgPreview; at: number }>();
 const OG_TTL_MS = 10 * 60 * 1000;
@@ -312,7 +316,7 @@ function readBody(req: http.IncomingMessage): Promise<any> {
     });
   });
 }
-const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 function serveStatic(res: http.ServerResponse, file: string) {
   const full = path.join(WEB_DIR, file);
   if (!full.startsWith(WEB_DIR) || !fs.existsSync(full)) {
@@ -328,15 +332,17 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://localhost:${PORT}`);
   const p = url.pathname;
   const port = (server.address() as AddressInfo).port;
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
   const problem = localRequestProblem(req, port);
   if (problem) return sendJson(res, 403, { error: `Refused: only this GUI's own page may use the API (${problem})` });
   if (p === '/launch' && req.method === 'GET') {
     if (!matchesSecret(url.searchParams.get('t'), LAUNCH_SECRET)) return sendJson(res, 403, { error: 'Invalid launch link; use the one printed in the terminal that started the GUI' });
-    res.writeHead(303, { 'Set-Cookie': sessionCookie(port, LAUNCH_SECRET), Location: '/', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    res.writeHead(303, { 'Set-Cookie': sessionCookie(port, PAGE_SECRET), Location: launchLocation(API_TOKEN), 'Cache-Control': 'no-store' });
     return res.end();
   }
-  if (!hasSession(req.headers, port, LAUNCH_SECRET)) {
-    if (p.startsWith('/api/')) return sendJson(res, 401, { error: 'Open the launch link printed in the terminal that started the GUI' });
+  const isApi = p.startsWith('/api/');
+  if (!hasSession(req.headers, port, PAGE_SECRET) || (isApi && !hasApiToken(req.headers, API_TOKEN))) {
+    if (isApi) return sendJson(res, 401, { error: 'Open the launch link printed in the terminal that started the GUI', code: 'WEB_SESSION_REQUIRED' });
     res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end('kakao-mcp web: open the launch link printed in the terminal that started the GUI.\n');
   }
@@ -361,7 +367,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { userId: selfUserId, connected, endpoint, chats: [...chats.values()].map(metadataChat) });
     }
     if (p === '/api/events') {
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write(`event: status\ndata: ${JSON.stringify({ connected, endpoint, chats: [...chats.values()].map(metadataChat) })}\n\n`);
       sseClients.add(res);
       req.on('close', () => sseClients.delete(res));
@@ -646,7 +652,8 @@ const server = http.createServer(async (req, res) => {
       const cached = ogCache.get(target);
       if (cached && Date.now() - cached.at < OG_TTL_MS) return sendJson(res, 200, cached.preview);
       try {
-        const preview = await fetchOg(target);
+        // The page never loads a linked site's image itself (it would reach any host, local ports included).
+        const { image: _image, ...preview } = await fetchOg(target);
         ogCache.set(target, { preview, at: Date.now() });
         if (ogCache.size > 500) ogCache.delete(ogCache.keys().next().value as string);
         return sendJson(res, 200, preview);

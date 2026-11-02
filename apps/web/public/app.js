@@ -30,10 +30,46 @@ let lockCode = localStorage.getItem('kakaoweb_lock_code') || '1234';
 // ----------------------------------------------------------------------------
 // API Helper
 // ----------------------------------------------------------------------------
+// The launch link hands this page an API token in the URL fragment (never sent to a server). Only
+// this page's script holds it (sessionStorage is per origin, ports included) and every /api request
+// carries it in a header, which an image, a link or another local port cannot attach.
+const API_TOKEN_HEADER = 'X-Kakao-Web-Token';
+const API_TOKEN_KEY = 'kakaoweb_api_token';
+const apiToken = (() => {
+  const m = /^#t=([A-Za-z0-9_-]{20,})$/.exec(location.hash);
+  if (m) {
+    try { sessionStorage.setItem(API_TOKEN_KEY, m[1]); } catch {}
+    history.replaceState(null, '', location.pathname + location.search);
+    return m[1];
+  }
+  try { return sessionStorage.getItem(API_TOKEN_KEY) || ''; } catch { return ''; }
+})();
+
+/** A request to this GUI's own API, carrying the page's token. */
+async function apiFetch(path, opts = {}) {
+  const headers = new Headers(opts.headers || {});
+  headers.set(API_TOKEN_HEADER, apiToken);
+  const res = await fetch(path, { ...opts, headers, credentials: 'same-origin', cache: 'no-store' });
+  if (res.status === 401) showLaunchNotice();
+  return res;
+}
+
+let launchNoticeShown = false;
+/** This tab has no valid API token (opened without the launch link, or the GUI restarted). */
+function showLaunchNotice() {
+  if (launchNoticeShown) return;
+  launchNoticeShown = true;
+  const el = document.createElement('div');
+  el.className = 'launch-notice';
+  el.setAttribute('role', 'alert');
+  el.textContent = 'GUI를 시작한 터미널에 표시된 실행 링크를 다시 여세요. (새 탭이나 GUI 재시작 후에는 링크로 다시 열어야 합니다)';
+  document.body.appendChild(el);
+}
+
 async function api(path, opts) {
   let res;
   try {
-    res = await fetch(path, opts);
+    res = await apiFetch(path, opts);
   } catch (e) {
     // The request may have reached this GUI's server before the connection failed.
     const err = new Error('화면 서버와 연결이 끊겼습니다');
@@ -77,7 +113,74 @@ async function postWrite(path, kind, args) {
   }
 }
 
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/** A remote image URL the page may load (profile pictures): https only, never this machine. '' otherwise. */
+function safeImageUrl(u) {
+  if (typeof u !== 'string' || !u) return '';
+  if (/^data:image\/(?:png|jpe?g|gif|webp|bmp|avif);base64,[A-Za-z0-9+/=]*$/i.test(u)) return u;
+  let url;
+  try { url = new URL(u); } catch { return ''; }
+  if (url.protocol === 'http:') url.protocol = 'https:';
+  if (url.protocol !== 'https:' || url.username || url.password) return '';
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || /^127\./.test(host) || host === '[::1]' || host === '0.0.0.0') return '';
+  return url.href;
+}
+
+/** A CSS url() value for an already-checked URL; never build one by string concatenation in markup. */
+const cssUrl = (u) => `url(${JSON.stringify(String(u))})`;
+
+// Photos come from the daemon (/api/media), which needs the page's token: fetch them and show a local blob.
+const mediaCache = new Map(); // /api/media path -> Promise<blob: URL>
+const MEDIA_CACHE_MAX = 200;
+function mediaObjectUrl(path) {
+  let pending = mediaCache.get(path);
+  if (!pending) {
+    pending = apiFetch(path).then(async (res) => {
+      if (!res.ok) throw new Error(`media ${res.status}`);
+      return URL.createObjectURL(await res.blob());
+    });
+    pending.catch(() => mediaCache.delete(path));
+    mediaCache.set(path, pending);
+    if (mediaCache.size > MEDIA_CACHE_MAX) {
+      const [oldest, old] = mediaCache.entries().next().value;
+      mediaCache.delete(oldest);
+      old.then((u) => URL.revokeObjectURL(u), () => {});
+    }
+  }
+  return pending;
+}
+function loadMediaImage(img) {
+  const path = img.dataset.mediaSrc;
+  if (!path || !path.startsWith('/api/media?')) return;
+  mediaObjectUrl(path).then((u) => { img.src = u; }).catch(() => img.classList.add('media-failed'));
+}
+const mediaObserver = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      mediaObserver.unobserve(e.target);
+      loadMediaImage(e.target);
+    }
+  }, { rootMargin: '300px' })
+  : null;
+/** Start loading the daemon photos inside a freshly rendered element. */
+function hydrateMedia(root) {
+  root.querySelectorAll('img[data-media-src]').forEach((img) => (mediaObserver ? mediaObserver.observe(img) : loadMediaImage(img)));
+}
+
+/** The daemon paths for a photo message, or null when it carries no attachment key. */
+function photoMedia(m) {
+  const att = parseAttachment(m.attachment) || parseAttachment(m.text || '');
+  const token = att?.k || att?.token || att?.url;
+  // A URL is not a daemon attachment key: received messages never make this page load a URL themselves.
+  if (!token || typeof token !== 'string' || /^[a-z][a-z0-9+.-]*:/i.test(token)) return null;
+  const base = `/api/media?chatId=${encodeURIComponent(m.chatId)}&token=${encodeURIComponent(token)}`;
+  const messageId = m.messageId || m.logId;
+  const withId = messageId ? `${base}&messageId=${encodeURIComponent(messageId)}` : base;
+  return { thumb: `${withId}&mini=1`, full: withId };
+}
 
 function linkify(text) {
   const escaped = esc(text);
@@ -201,8 +304,9 @@ function initialsOf(name) {
 }
 
 function avatarHtml(name, img, cls = '') {
-  if (img) {
-    return `<span class="avatar ${cls}" style="background-image:url('${esc(img)}')"></span>`;
+  const src = safeImageUrl(img);
+  if (src) {
+    return `<span class="avatar ${esc(cls)}"><img class="avatar-img" src="${esc(src)}" alt="" referrerpolicy="no-referrer" loading="lazy" /></span>`;
   }
   const hue = [...String(name || '?')].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return `<span class="avatar ${cls}" style="background:hsl(${hue} 45% 72%)">${esc(initialsOf(name))}</span>`;
@@ -358,7 +462,7 @@ let realFriends = [];
 
 async function loadRealFriends() {
   try {
-    const res = await fetch('/api/friends?limit=1000');
+    const res = await apiFetch('/api/friends?limit=1000');
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.friends) && data.friends.length > 0) {
@@ -461,8 +565,9 @@ function renderFriends() {
 
   // My profile card info
   $('myName').textContent = (currentChatMembers[me]?.name || '나');
-  if (currentChatMembers[me]?.img) {
-    $('myAvatar').style.backgroundImage = `url('${esc(currentChatMembers[me].img)}')`;
+  const myImg = safeImageUrl(currentChatMembers[me]?.img);
+  if (myImg) {
+    $('myAvatar').style.backgroundImage = cssUrl(myImg);
     $('myAvatar').textContent = '';
   }
 }
@@ -528,7 +633,7 @@ async function startDirectChatWith(targetUserId, friendName) {
 
   // 2. Open or create via LOCO CREATE on the server
   try {
-    const res = await fetch('/api/friends/chat', {
+    const res = await apiFetch('/api/friends/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: targetUserId })
@@ -913,6 +1018,7 @@ function appendMessageElement(m, container) {
   });
 
   container.appendChild(row);
+  hydrateMedia(row);
   maybeRenderLinkPreview(row, m);
   lastRenderedAuthor = m.authorId;
   lastRenderedTimestamp = sendTime;
@@ -933,14 +1039,14 @@ function maybeRenderLinkPreview(row, m) {
   ogInflight.add(key);
   api(`/api/og?url=${encodeURIComponent(link)}`)
     .then((og) => {
-      if (!og || og.error || (!og.title && !og.description && !og.image)) return;
+      // Preview text only: the page never loads a linked site's image (it could point at any host).
+      if (!og || og.error || (!og.title && !og.description)) return;
       const card = document.createElement('a');
       card.className = 'link-preview';
       card.href = og.url || link;
       card.target = '_blank';
       card.rel = 'noopener noreferrer';
       card.innerHTML = `
-        ${og.image ? `<div class="link-preview-img" style="background-image:url('${esc(og.image)}')"></div>` : ''}
         <div class="link-preview-body">
           ${og.title ? `<div class="link-preview-title">${esc(og.title)}</div>` : ''}
           ${og.description ? `<div class="link-preview-desc">${esc(og.description)}</div>` : ''}
@@ -958,16 +1064,10 @@ function renderBubbleContent(m) {
 
   // Photo (type: 2) or MultiPhoto (type: 27)
   if (type === 2 || type === 27) {
-    const att = parseAttachment(m.attachment) || parseAttachment(rawText);
-    const token = att?.k || att?.token || att?.url;
-    if (token) {
-      if (token.startsWith('http') || token.startsWith('data:')) {
-        return `<img class="bubble-img" src="${esc(token)}" alt="사진" data-full-url="${esc(token)}" onclick="openLightbox(this.dataset.fullUrl)" />`;
-      }
-      const thumbUrl = `/api/media?chatId=${encodeURIComponent(m.chatId)}&token=${encodeURIComponent(token)}&mini=1`;
-      const fullUrl = `/api/media?chatId=${encodeURIComponent(m.chatId)}&token=${encodeURIComponent(token)}`;
-      return `<img class="bubble-img" src="${esc(thumbUrl)}" alt="사진" data-full-url="${esc(fullUrl)}" onclick="openLightbox(this.dataset.fullUrl)" loading="lazy" />`;
-    }
+    // Loaded by hydrateMedia() and opened by the delegated click handler in init(); no inline handlers.
+    const media = photoMedia(m);
+    if (media) return `<img class="bubble-img" alt="사진" data-media-src="${esc(media.thumb)}" data-full-url="${esc(media.full)}" />`;
+    return '<div class="bubble-photo-missing">[사진]</div>';
   }
 
   // Voice Call
@@ -1158,7 +1258,8 @@ function handleAttachedFile(file) {
     };
     $('attachmentName').textContent = pendingAttachment.name;
     $('attachmentSize').textContent = pendingAttachment.size;
-    $('attachmentThumb').style.backgroundImage = `url('${pendingAttachment.dataUrl}')`;
+    const thumb = safeImageUrl(pendingAttachment.dataUrl);
+    $('attachmentThumb').style.backgroundImage = thumb ? cssUrl(thumb) : '';
     $('attachmentPreviewBar').classList.remove('hidden');
     $('input').focus();
   };
@@ -1373,17 +1474,15 @@ function updateDrawerData() {
   const mediaGrid = $('drawerMediaGrid');
   mediaGrid.innerHTML = '';
   currentMessages
-    .filter((m) => m.type === 2)
+    .filter((m) => m.type === 2 || m.type === 27)
     .forEach((m) => {
-      const att = parseAttachment(m.text);
-      const url = att?.url || att?.thumbnailUrl || m.text;
-      if (url && (url.startsWith('http') || url.startsWith('data:'))) {
-        const thumb = document.createElement('div');
-        thumb.className = 'drawer-media-thumb';
-        thumb.style.backgroundImage = `url('${esc(url)}')`;
-        thumb.onclick = () => openLightbox(url);
-        mediaGrid.appendChild(thumb);
-      }
+      const media = photoMedia(m);
+      if (!media) return;
+      const thumb = document.createElement('div');
+      thumb.className = 'drawer-media-thumb';
+      mediaObjectUrl(media.thumb).then((u) => { thumb.style.backgroundImage = cssUrl(u); }).catch(() => {});
+      thumb.onclick = () => openLightbox(media.full);
+      mediaGrid.appendChild(thumb);
     });
 
   // Links
@@ -1395,7 +1494,7 @@ function updateDrawerData() {
     if (matches) {
       matches.forEach((u) => {
         const row = document.createElement('div');
-        row.innerHTML = `<a href="${esc(u)}" target="_blank" style="font-size:12px; color:var(--ink);">${esc(u)}</a>`;
+        row.innerHTML = `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:var(--ink);">${esc(u)}</a>`;
         linksList.appendChild(row);
       });
     }
@@ -1733,10 +1832,19 @@ function showDesktopNotification(chat, text) {
 // ----------------------------------------------------------------------------
 // Lightbox
 // ----------------------------------------------------------------------------
-function openLightbox(url) {
-  $('lightboxImg').src = url;
-  $('lightboxDownload').href = url;
+let lightboxSeq = 0;
+/** Show a daemon photo (an /api/media path) full size; it is fetched with the page's token. */
+function openLightbox(path) {
+  const seq = ++lightboxSeq;
+  $('lightboxImg').removeAttribute('src');
+  $('lightboxDownload').removeAttribute('href');
   $('imageLightbox').classList.remove('hidden');
+  if (typeof path !== 'string' || !path.startsWith('/api/media?')) return;
+  mediaObjectUrl(path).then((u) => {
+    if (seq !== lightboxSeq) return;
+    $('lightboxImg').src = u;
+    $('lightboxDownload').href = u;
+  }).catch(() => {});
 }
 
 function closeAllPopups() {
@@ -1943,8 +2051,67 @@ function initApprovals() {
 // ----------------------------------------------------------------------------
 // Server-Sent Events (SSE) Real-Time Connection
 // ----------------------------------------------------------------------------
+// EventSource cannot send the API token header, so the stream is read through apiFetch() instead.
+class TokenEventSource {
+  constructor(path) {
+    this.path = path;
+    this.listeners = new Map();
+    this.onerror = null;
+    void this.run();
+  }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(block) {
+    let type = 'message';
+    const data = [];
+    for (const line of block.split('\n')) {
+      if (!line || line.startsWith(':')) continue;
+      const colon = line.indexOf(':');
+      const field = colon < 0 ? line : line.slice(0, colon);
+      let value = colon < 0 ? '' : line.slice(colon + 1);
+      if (value.startsWith(' ')) value = value.slice(1);
+      if (field === 'event') type = value;
+      else if (field === 'data') data.push(value);
+    }
+    if (!data.length) return;
+    for (const fn of this.listeners.get(type) || []) {
+      try { fn({ type, data: data.join('\n') }); } catch (e) { console.error(e); }
+    }
+  }
+  async run() {
+    for (;;) {
+      let status = 0;
+      try {
+        const res = await apiFetch(this.path, { headers: { Accept: 'text/event-stream' } });
+        status = res.status;
+        if (!res.ok || !res.body) throw new Error(`events ${res.status}`);
+        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buf = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += value;
+          let end;
+          while ((end = buf.indexOf('\n\n')) >= 0) {
+            this.dispatch(buf.slice(0, end));
+            buf = buf.slice(end + 2);
+          }
+        }
+        throw new Error('events stream ended');
+      } catch (e) {
+        if (this.onerror) this.onerror(e);
+        // Without a valid token, retrying cannot help; the launch notice is shown.
+        if (status === 401) return;
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+  }
+}
+
 function connectSSE() {
-  const es = new EventSource('/api/events');
+  const es = new TokenEventSource('/api/events');
 
   es.addEventListener('status', (ev) => {
     const d = JSON.parse(ev.data);
@@ -2118,8 +2285,9 @@ function applyOpacity(pct) {
 function applyWallpaper(dataUrl) {
   const el = $('messages');
   if (!el) return;
-  if (dataUrl) {
-    el.style.backgroundImage = `url('${dataUrl}')`;
+  const wallpaper = safeImageUrl(dataUrl);
+  if (wallpaper) {
+    el.style.backgroundImage = cssUrl(wallpaper);
     el.style.backgroundSize = 'cover';
     el.style.backgroundPosition = 'center';
   } else {
@@ -2383,6 +2551,12 @@ async function init() {
   $('composer').addEventListener('submit', (e) => {
     e.preventDefault();
     sendMessage();
+  });
+
+  // Photo bubbles open full size (delegated: rendered markup carries no inline handlers).
+  $('messages').addEventListener('click', (e) => {
+    const img = e.target instanceof Element ? e.target.closest('img.bubble-img[data-full-url]') : null;
+    if (img) openLightbox(img.dataset.fullUrl);
   });
 
   // Close modals
