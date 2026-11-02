@@ -52,6 +52,16 @@ flowchart LR
 
 데몬 **하나**가 카카오톡 연결을 쥐고 있고, AI·CLI·웹은 모두 그 데몬의 **MCP 클라이언트**입니다. 클라이언트 쪽은 카카오 계정 정보를 읽지 않고, 자기 세션을 따로 열지도 않습니다.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.png">
+  <img alt="kakao-mcp 전체 구조: 사용자 → AI 클라이언트 → MCP 커넥터 → SSH 터널 → 서버의 MCP 서버 → core → protocol → 카카오톡 서버. core는 SQLite에 저장하고, 웹 화면과 터미널 CLI도 같은 MCP 서버에 연결합니다." src="docs/diagrams/architecture-light.png">
+</picture>
+
+<sub>[archify](https://github.com/tt-a1i/archify)로 코드 근거를 붙여 그린 구조도입니다. 노드마다 근거 코드 링크가 달린 인터랙티브 버전은 [`docs/diagrams/architecture.html`](docs/diagrams/architecture.html)을 내려받아 브라우저로 열어 보세요. 원본 정의는 [`architecture.archify.json`](docs/diagrams/architecture.archify.json)입니다.</sub>
+
+<details>
+<summary><b>Mermaid 버전 보기</b></summary>
+
 ```mermaid
 flowchart TB
     subgraph PC["🧑‍💻 사용하는 컴퓨터"]
@@ -83,6 +93,8 @@ flowchart TB
     WEBUI == "SSH 터널" ==> MCP
     PROTO <== "LOCO<br/>RSA + AES-GCM" ==> KAKAO
 ```
+
+</details>
 
 > 💡 AI가 같은 서버에 있으면 SSH 없이 `127.0.0.1:8787`로 바로 연결합니다. MCP 포트는 서버 밖으로 열지 않습니다.
 

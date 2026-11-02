@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "kakao-mcp 전체 구조",
+    "locale": "ko",
+    "output": ".archify/architecture-kakao-mcp-20261102-025943/kakao-mcp-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "fe88a2cf143aefdb2314c722e470e63b0766bdc7"
+    }
+  },
+  "components": [
+    { "id": "ai", "type": "external", "label": "AI 클라이언트", "sublabel": "Claude · Codex 등", "pos": [40, 40], "size": [150, 60],
+      "sources": [{ "path": "docs/QUICKSTART.md", "line": 3, "end_line": 5, "label": "데몬 하나에 AI가 연결" }] },
+    { "id": "connector", "type": "frontend", "label": "MCP 커넥터", "sublabel": "stdio ↔ 소켓 중계", "pos": [310, 40], "size": [150, 60],
+      "sources": [{ "path": "apps/mcp/src/connect.ts", "line": 11, "end_line": 44, "label": "bridgeMcp" }] },
+    { "id": "ssh", "type": "security", "label": "SSH 터널", "sublabel": "ssh -T -W", "pos": [540, 40], "size": [140, 60],
+      "sources": [{ "path": "apps/mcp/src/daemon-connection.ts", "line": 20, "end_line": 33, "label": "openDaemon (ssh -W)" }] },
+    { "id": "mcp", "type": "backend", "label": "MCP 서버", "sublabel": "127.0.0.1:8787", "pos": [780, 40], "size": [150, 60], "tag": "loopback 전용",
+      "sources": [
+        { "path": "apps/mcp/src/socket-transport.ts", "line": 86, "end_line": 112, "label": "serveSocket · 허용 OS 사용자" },
+        { "path": "apps/mcp/src/index.ts", "line": 33, "end_line": 38, "label": "KakaoSession + McpStdioServer" }
+      ] },
+    { "id": "cli", "type": "frontend", "label": "터미널 CLI", "sublabel": "kakao-mcp chat", "pos": [1050, 40], "size": [150, 60],
+      "sources": [{ "path": "apps/cli/src/mcp-client.ts", "line": 1, "end_line": 8, "label": "데몬 전용 MCP 클라이언트" }] },
+    { "id": "core", "type": "backend", "label": "core", "sublabel": "세션 · 권한 · 승인 · 쓰기", "pos": [780, 200], "size": [150, 60],
+      "sources": [
+        { "path": "packages/core/src/kakao-session.ts", "line": 1, "end_line": 12, "label": "단일 계정 세션" },
+        { "path": "packages/core/src/room-access.ts", "line": 102, "end_line": 102, "label": "RoomAccessPolicy" },
+        { "path": "packages/core/src/agent-send.ts", "line": 35, "end_line": 37, "label": "requestId → 메시지 ID" }
+      ] },
+    { "id": "protocol", "type": "backend", "label": "protocol", "sublabel": "LOCO · BSON · 암호화", "pos": [1050, 200], "size": [150, 60],
+      "sources": [
+        { "path": "packages/protocol/src/transport/loco-session.ts", "line": 313, "end_line": 317, "label": "핸드셰이크 + LOGINLIST" },
+        { "path": "packages/protocol/src/crypto/loco-crypto.ts", "line": 18, "end_line": 25, "label": "RSA-OAEP + AES-128-GCM" }
+      ] },
+    { "id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "kakao.db · 0600", "pos": [780, 360], "size": [150, 60],
+      "sources": [{ "path": "packages/core/src/db.ts", "line": 284, "end_line": 290, "label": "소유자 전용 파일" }] },
+    { "id": "kakao", "type": "external", "label": "카카오톡 서버", "sublabel": "LOCO 채팅 서버", "pos": [1050, 520], "size": [150, 60] },
+    { "id": "web", "type": "frontend", "label": "웹 화면", "sublabel": "127.0.0.1:8899", "pos": [310, 200], "size": [150, 60], "tag": "REST + SSE",
+      "sources": [{ "path": "apps/web/src/index.ts", "line": 17, "end_line": 22, "label": "로컬 웹 GUI" }] },
+    { "id": "user", "type": "external", "label": "사용자", "sublabel": "요청 · 승인", "icon": "person", "pos": [40, 360], "size": [150, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "사용하는 컴퓨터", "wraps": ["ai", "connector", "web"] },
+    { "kind": "region", "label": "Linux 서버 · kakao-mcp.service", "wraps": ["mcp", "cli", "core", "protocol", "sqlite"] }
+  ],
+  "connections": [
+    { "id": "user-asks-ai", "from": "user", "to": "ai", "label": "요청 · 승인", "variant": "emphasis" },
+    { "id": "ai-to-connector", "from": "ai", "to": "connector", "label": "stdio JSON-RPC", "variant": "emphasis" },
+    { "id": "connector-to-ssh", "from": "connector", "to": "ssh", "label": "ssh -W", "variant": "emphasis" },
+    { "id": "ssh-to-mcp", "from": "ssh", "to": "mcp", "label": "loopback TCP", "variant": "emphasis" },
+    { "id": "mcp-to-core", "from": "mcp", "to": "core", "label": "tools/call", "variant": "emphasis" },
+    { "id": "core-to-protocol", "from": "core", "to": "protocol", "label": "WRITE · SYNCMSG", "variant": "emphasis" },
+    { "id": "protocol-to-kakao", "from": "protocol", "to": "kakao", "label": "LOCO 암호화", "variant": "security" },
+    { "id": "core-to-sqlite", "from": "core", "to": "sqlite", "label": "저장 · 조회" },
+    { "id": "user-to-web", "from": "user", "to": "web", "label": "브라우저" },
+    { "id": "web-to-ssh", "from": "web", "to": "ssh", "label": "SSH 또는 로컬" },
+    { "id": "cli-to-mcp", "from": "cli", "to": "mcp", "label": "loopback TCP" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "연결", "items": ["AI·웹·CLI는 모두 같은 데몬의 MCP 클라이언트이며 계정 정보를 읽지 않음", "MCP 포트는 loopback 전용, 원격은 SSH 터널로 접속", "Linux에서는 허용한 OS 사용자의 연결만 받음"] },
+    { "dot": "rose", "title": "권한과 승인", "items": ["처음 쓰는 방의 읽기·전송은 확인 창이나 패스키로 사람이 승인", "운영자 상한·속도 제한은 승인으로도 넘지 못함", "모든 쓰기는 UUID requestId로 중복 전송을 막음"] },
+    { "dot": "emerald", "title": "저장", "items": ["수신 메시지는 방 규칙과 무관하게 SQLite에 저장", "AI가 읽으려면 읽기 권한을 다시 통과해야 함", "DB 파일은 소유자만 읽기·쓰기(0600)"] }
+  ]
+}
