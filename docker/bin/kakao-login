@@ -1,0 +1,35 @@
+#!/bin/sh
+# Link a KakaoTalk account: registers this container as a device after phone approval.
+# The password is passed only to the registration process and is never written to disk.
+set -eu
+umask 077
+mkdir -p "$HOME" "$KAKAO_DATA_DIR"
+cd /data
+
+if [ ! -t 0 ]; then
+  echo '[kakao-login] 터미널에서 실행하세요: docker compose -f docker/compose.yaml exec kakao-mcp kakao-login' >&2
+  exit 1
+fi
+
+printf '카카오 계정 (이메일 또는 전화번호): '
+read -r email
+trap 'stty echo 2>/dev/null' EXIT INT TERM
+stty -echo
+printf '비밀번호 (화면에 표시되지 않음): '
+read -r password
+stty echo
+echo
+
+if [ -z "$email" ] || [ -z "$password" ]; then
+  echo '[kakao-login] 계정과 비밀번호를 모두 입력하세요.' >&2
+  exit 1
+fi
+
+status=0
+KAKAO_EMAIL="$email" KAKAO_PASSWORD="$password" \
+  node --experimental-strip-types /app/apps/mcp/src/register.ts || status=$?
+unset password
+if [ "$status" -eq 0 ]; then
+  echo '[kakao-login] 연결했습니다. 이제 데몬을 시작하세요: docker compose -f docker/compose.yaml restart kakao-mcp'
+fi
+exit "$status"

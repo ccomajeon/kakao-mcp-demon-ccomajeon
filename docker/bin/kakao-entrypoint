@@ -1,0 +1,15 @@
+#!/bin/sh
+# Container main process: wait until an account is linked, then run the daemon in the foreground.
+set -eu
+umask 077
+mkdir -p "$HOME" "$KAKAO_DATA_DIR"
+cd /data
+
+if ! grep -q '^KAKAO_ACCESS_TOKEN=.' /data/.env.local 2>/dev/null; then
+  echo '[kakao-mcp] 아직 카카오 계정이 연결되지 않았습니다.'
+  echo '[kakao-mcp] 1) docker compose -f docker/compose.yaml exec kakao-mcp kakao-login'
+  echo '[kakao-mcp] 2) docker compose -f docker/compose.yaml restart kakao-mcp'
+  exec sleep infinity
+fi
+
+exec node --experimental-strip-types /app/apps/mcp/src/index.ts

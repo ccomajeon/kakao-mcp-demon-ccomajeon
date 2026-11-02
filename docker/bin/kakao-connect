@@ -1,0 +1,7 @@
+#!/bin/sh
+# MCP stdio connector for an AI client on the host:
+#   claude mcp add kakao-mcp -- docker exec -i kakao-mcp kakao-connect
+# It only relays stdio to the daemon's loopback socket inside the container.
+set -eu
+cd /data
+exec node --experimental-strip-types /app/apps/mcp/src/connect.ts --listen 127.0.0.1:8787

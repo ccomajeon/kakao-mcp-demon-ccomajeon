@@ -1,0 +1,6 @@
+#!/bin/sh
+# Terminal CLI (status, list, chat, history, send ...) against the daemon in this container.
+set -eu
+mkdir -p "$HOME"
+cd /data
+exec node --experimental-strip-types /app/apps/cli/src/index.ts "$@"

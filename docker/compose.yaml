@@ -1,0 +1,29 @@
+# Local test setup. Run from the repository root:
+#   docker compose -f docker/compose.yaml up -d --build
+# Guide: docs/runbooks/docker.md
+name: kakao-mcp
+
+services:
+  kakao-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: kakao-mcp:local
+    container_name: kakao-mcp
+    restart: unless-stopped
+    init: true
+    volumes:
+      - kakao-data:/data
+    ports:
+      # Web GUI only, and only on this computer's loopback. The MCP port (8787) is never published.
+      - "127.0.0.1:8899:18899"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  kakao-data:

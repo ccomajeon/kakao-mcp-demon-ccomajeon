@@ -1,0 +1,11 @@
+#!/bin/sh
+# Local web GUI. It binds 127.0.0.1:8899 inside the container; a small relay forwards the
+# published port 18899 to it, and compose publishes that only on the host's 127.0.0.1:8899.
+set -eu
+mkdir -p "$HOME"
+cd /data
+node /usr/local/bin/kakao-relay.mjs 18899 8899 &
+relay=$!
+trap 'kill "$relay" 2>/dev/null' EXIT INT TERM
+echo '[kakao-web] 아래 launch 링크를 이 컴퓨터의 브라우저에서 여세요. 종료: Ctrl-C'
+PORT=8899 node --experimental-strip-types /app/apps/web/src/index.ts
