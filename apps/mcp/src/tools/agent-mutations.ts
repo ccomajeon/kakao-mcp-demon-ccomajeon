@@ -1,5 +1,5 @@
 import { prepareAndCommit, REQUEST_ID } from './one-call.ts';
-import { canonicalAgentJson, KakaoError, toKakaoError, type KakaoSession, type AgentMutationAdapter, type AgentMutationService, type AgentMutationAction, type AgentMutationRequest } from '@kakao-mcp/core';
+import { canonicalAgentJson, KakaoError, parseRoomReview, toKakaoError, type KakaoSession, type AgentMutationAdapter, type AgentMutationService, type AgentMutationAction, type AgentMutationRequest } from '@kakao-mcp/core';
 import { markUntrusted, UNTRUSTED_TOOL_NOTE } from '../untrusted.ts';
 import type { McpStdioServer } from '../mcp-stdio.ts';
 
@@ -16,7 +16,9 @@ export function agentMutationAdapter(kakao: KakaoSession): AgentMutationAdapter 
   const room = (id: string) => {
     const found = kakao.listChats().find(c => c.id === id);
     if (!found) throw new KakaoError('NOT_FOUND','Exact mutation room unavailable');
-    return { maxLogId:found.maxLogId,memberCount:found.memberCount ?? null };
+    // Title and type are shown to the person with the approval (untrusted text) and bound like the rest.
+    const review = parseRoomReview({ title: found.title ?? null, type: found.type ?? null, memberCount: found.memberCount ?? null });
+    return { maxLogId:found.maxLogId,memberCount:review.memberCount,title:review.title,type:review.type };
   };
   return {accountId:()=>kakao.selfUserId,connected:()=>kakao.getState().connected,
     inspect: async (action, request) => {

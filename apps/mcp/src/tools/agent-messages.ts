@@ -12,6 +12,11 @@ export function agentMessageAdapter(kakao: Pick<KakaoSession, 'selfUserId' | 'ge
       if (!chat) throw new KakaoError('NOT_FOUND', 'Exact account room unavailable');
       return canonicalAgentJson({ maxLogId: chat.maxLogId, memberCount: chat.memberCount ?? null });
     },
+    // Shown to the person with the approval; a 1:1 room is usually titled with the other member's name.
+    room: chatId => {
+      const chat = kakao.listChats().find(c => c.id === chatId);
+      return { title: chat?.title ?? null, type: chat?.type ?? null, memberCount: chat?.memberCount ?? null };
+    },
     send: async (message, attempt) => {
       const result = message.mentions?.length ? await kakao.sendWithMentions(message.chatId, message.text, message.mentions, attempt)
         : message.replyToLogId ? await kakao.sendReply(message.chatId, message.text, {

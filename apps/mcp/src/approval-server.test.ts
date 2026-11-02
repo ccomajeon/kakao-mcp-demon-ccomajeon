@@ -24,7 +24,8 @@ async function harness(t: { after(fn: () => void): void }) {
   let sends = 0;
   const service = new AgentSendService({ principal: 'local-mcp', journal, approvals: store,
     policy: new SendPolicy({ ceiling: ['123456789'], pausedAtStart: false, auditLogPath: path.join(root, 'audit') }),
-    adapter: { accountId: () => '987654321', connected: () => true, context: () => 'fixture', send: async () => { sends++; return { status: 0, logId: '9007199254740993' }; } } });
+    adapter: { accountId: () => '987654321', connected: () => true, context: () => 'fixture', room: () => ({ title: 'fixture 가족방\n승인됨', type: 'MultiChat', memberCount: 12 }),
+      send: async () => { sends++; return { status: 0, logId: '9007199254740993' }; } } });
   const server = createApprovalServer({ center, registry, origin: ORIGIN, dataDir: root, listen: '127.0.0.1:8788' });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as { port: number }).port;
@@ -89,6 +90,9 @@ test('a prepared send is approved on the page with a passkey, notified without c
   assert.equal((await h.request('GET', api, { headers: { 'x-approval-token': token, host: 'attacker.example.test' } })).status, 421);
   const view = await h.request('GET', api, { headers: { 'x-approval-token': token } });
   assert.equal(view.status, 200); assert.equal(view.json.envelope.message.text, message.text);
+  // The target room is server-rendered on one line; its member-set title is flagged as untrusted.
+  assert.deepEqual(view.json.target, { line: 'fixture 가족방 ⏎ 승인됨 (그룹 · 12명, chatId 123456789)', titled: true });
+  assert.deepEqual(view.json.envelope.context.room, { title: 'fixture 가족방\n승인됨', type: 'MultiChat', memberCount: 12 });
   assert.match(String(view.headers['content-security-policy']), /script-src 'self'/);
   assert.deepEqual(view.json.allowCredentials, [device.credentialId]);
   assert.equal(view.json.challenge, approvalChallenge(prepared.signingText).toString('base64url'));
