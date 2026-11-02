@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "설치와 사용 순서",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-install-steps-20261102-030705/install-steps.html",
+    "legend": { "entries": {
+      "backend": { "label": "서버" },
+      "security": { "label": "사람 승인" },
+      "frontend": { "label": "클라이언트 (AI · 웹 · 터미널)" }
+    } }
+  },
+  "lanes": [
+    { "id": "steps", "label": "설치와 사용법" }
+  ],
+  "mainPath": ["package", "login", "connect", "use"],
+  "nodes": [
+    { "id": "package", "lane": "steps", "col": 0, "type": "backend", "label": "1. 서버에 패키지 설치", "sublabel": "npm install --global" },
+    { "id": "login", "lane": "steps", "col": 1, "type": "security", "icon": "person", "label": "2. 휴대폰으로 로그인 승인", "sublabel": "kakao-mcp setup" },
+    { "id": "connect", "lane": "steps", "col": 2, "type": "frontend", "label": "3. AI 클라이언트 연결", "sublabel": "claude mcp add …" },
+    { "id": "use", "lane": "steps", "col": 3, "type": "frontend", "icon": "success", "label": "4. 웹·터미널에서 사용", "sublabel": "kakao-mcp web" }
+  ],
+  "edges": [
+    { "id": "package-login", "from": "package", "to": "login", "variant": "emphasis" },
+    { "id": "login-connect", "from": "login", "to": "connect", "variant": "emphasis" },
+    { "id": "connect-use", "from": "connect", "to": "use", "variant": "emphasis" }
+  ]
+}

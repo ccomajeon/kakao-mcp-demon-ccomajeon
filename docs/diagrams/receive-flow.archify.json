@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "새 메시지를 받을 때",
+    "locale": "ko",
+    "output": ".archify/dataflow-receive-flow-20261102-030858/receive-flow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    },
+    "legend": {
+      "entries": {
+        "dashed": {
+          "label": "본문 없는 변경 알림"
+        }
+      }
+    }
+  },
+  "stages": [
+    {
+      "label": "카카오"
+    },
+    {
+      "label": "수신"
+    },
+    {
+      "label": "처리"
+    },
+    {
+      "label": "저장 · 버퍼"
+    },
+    {
+      "label": "읽는 쪽"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "kakao",
+      "type": "external",
+      "label": "카카오 서버",
+      "sublabel": "LOCO 채팅 서버",
+      "stage": 0,
+      "row": 1
+    },
+    {
+      "id": "protocol",
+      "type": "backend",
+      "label": "protocol",
+      "sublabel": "LOCO 패킷 해석",
+      "stage": 1,
+      "row": 1,
+      "sources": [
+        {
+          "path": "packages/protocol/src/transport/loco-session.ts",
+          "line": 1044,
+          "end_line": 1055,
+          "label": "MSG 푸시 → message 이벤트"
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "core",
+      "sublabel": "단일 계정 세션",
+      "stage": 2,
+      "row": 1,
+      "sources": [
+        {
+          "path": "packages/core/src/kakao-session.ts",
+          "line": 1,
+          "end_line": 12,
+          "label": "세션 · 피드 · 저장소 조율"
+        },
+        {
+          "path": "packages/core/src/kakao-session.ts",
+          "line": 1422,
+          "end_line": 1444,
+          "label": "ingest: 저장 후 피드"
+        },
+        {
+          "path": "packages/core/src/kakao-session.ts",
+          "line": 933,
+          "end_line": 956,
+          "label": "방 변경 감시"
+        }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "메시지 · 이벤트 큐",
+      "stage": 3,
+      "row": 0,
+      "sources": [
+        {
+          "path": "packages/core/src/message-inbox.ts",
+          "line": 87,
+          "end_line": 97,
+          "label": "수신 저장 + 체크포인트"
+        },
+        {
+          "path": "packages/core/src/message-store.ts",
+          "line": 124,
+          "end_line": 129,
+          "label": "saveReceivedMessage"
+        },
+        {
+          "path": "packages/core/src/db.ts",
+          "line": 86,
+          "end_line": 103,
+          "label": "message_inbox_events"
+        }
+      ]
+    },
+    {
+      "id": "feed",
+      "type": "messagebus",
+      "label": "원형 버퍼",
+      "sublabel": "실시간 · 최대 500개",
+      "stage": 3,
+      "row": 2,
+      "sources": [
+        {
+          "path": "packages/core/src/message-feed.ts",
+          "line": 1,
+          "end_line": 39,
+          "label": "크기 제한 원형 버퍼"
+        },
+        {
+          "path": "packages/core/src/message-feed.ts",
+          "line": 52,
+          "end_line": 77,
+          "label": "recent · wait"
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "frontend",
+      "label": "AI",
+      "sublabel": "MCP 클라이언트",
+      "stage": 4,
+      "row": 1,
+      "sources": [
+        {
+          "path": "apps/mcp/src/tools/core-read.ts",
+          "line": 137,
+          "end_line": 144,
+          "label": "read_messages (wait)"
+        },
+        {
+          "path": "apps/mcp/src/tools/message-inbox.ts",
+          "line": 10,
+          "end_line": 36,
+          "label": "claim/ack_message_events"
+        },
+        {
+          "path": "apps/mcp/src/message-resources.ts",
+          "line": 11,
+          "end_line": 29,
+          "label": "본문 없는 변경 알림"
+        }
+      ]
+    },
+    {
+      "id": "tui",
+      "type": "frontend",
+      "label": "터미널 메신저",
+      "sublabel": "kakao-mcp chat",
+      "stage": 4,
+      "row": 3,
+      "sources": [
+        {
+          "path": "packages/client/src/mcp-reader.ts",
+          "line": 50,
+          "end_line": 78,
+          "label": "구독 후 recent 조회"
+        },
+        {
+          "path": "apps/cli/src/terminal-messenger.ts",
+          "line": 100,
+          "end_line": 106,
+          "label": "poll"
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "웹 화면",
+      "sublabel": "로컬 브라우저",
+      "stage": 4,
+      "row": 4,
+      "sources": [
+        {
+          "path": "apps/web/src/index.ts",
+          "line": 363,
+          "end_line": 368,
+          "label": "text/event-stream"
+        },
+        {
+          "path": "apps/web/src/index.ts",
+          "line": 57,
+          "end_line": 65,
+          "label": "SSE는 본문 제외"
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "msg-push",
+      "from": "kakao",
+      "to": "protocol",
+      "label": "MSG 푸시",
+      "variant": "emphasis"
+    },
+    {
+      "id": "message-event",
+      "from": "protocol",
+      "to": "core",
+      "label": "message 이벤트",
+      "variant": "emphasis"
+    },
+    {
+      "id": "store-all",
+      "from": "core",
+      "to": "sqlite",
+      "label": "방 규칙 무관 저장",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "feed-push",
+      "from": "core",
+      "to": "feed",
+      "label": "실시간 push",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "claim-ack",
+      "from": "sqlite",
+      "to": "ai",
+      "label": "claim/ack 이벤트",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "wait-read",
+      "from": "feed",
+      "to": "ai",
+      "label": "read_messages wait",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "recent-read",
+      "from": "feed",
+      "to": "tui",
+      "label": "recent 이벤트",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "sse-status",
+      "from": "core",
+      "to": "web",
+      "label": "SSE 상태 알림",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "resource-updated",
+      "from": "core",
+      "to": "ai",
+      "label": "resources/updated",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "저장과 열람은 별개",
+      "items": [
+        "수신 메시지는 방 규칙과 관계없이 모두 로컬 SQLite에 저장",
+        "AI가 본문을 읽으려면 read_messages · claim_message_events가 읽기 권한을 다시 확인",
+        "읽기와 읽음 표시는 별개: 위 도구는 읽음 표시를 보내지 않음"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "실시간과 영구 전달",
+      "items": [
+        "원형 버퍼는 최근 500개만 담고 재시작하면 비워짐 (read_messages wait · recent)",
+        "끊김 없이 받아야 하면 SQLite 이벤트 큐의 claim/ack_message_events 사용",
+        "터미널 메신저는 변경 알림을 구독하고 recent로 새 메시지를 가져옴"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "변경 알림",
+      "items": [
+        "kakao://rooms/{chatId}/messages 구독 시 resources/updated를 보냄",
+        "알림에는 본문 · 작성자 · 메시지 ID가 없음: 본문은 항상 read_messages로 읽음",
+        "웹 화면 SSE도 연결 상태 · 방 정보만 보내고 본문은 방 기록 조회로 가져옴"
+      ]
+    }
+  ]
+}

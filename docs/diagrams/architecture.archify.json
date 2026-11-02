@@ -10,7 +10,7 @@
       "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
       "provider": "github",
       "link_mode": "web",
-      "revision": "fe88a2cf143aefdb2314c722e470e63b0766bdc7"
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
     }
   },
   "components": [
@@ -55,7 +55,7 @@
     { "id": "connector-to-ssh", "from": "connector", "to": "ssh", "label": "ssh -W", "variant": "emphasis" },
     { "id": "ssh-to-mcp", "from": "ssh", "to": "mcp", "label": "loopback TCP", "variant": "emphasis" },
     { "id": "mcp-to-core", "from": "mcp", "to": "core", "label": "tools/call", "variant": "emphasis" },
-    { "id": "core-to-protocol", "from": "core", "to": "protocol", "label": "WRITE · SYNCMSG", "variant": "emphasis" },
+    { "id": "core-to-protocol", "from": "core", "to": "protocol", "label": "WRITE · MCHATLOGS", "variant": "emphasis" },
     { "id": "protocol-to-kakao", "from": "protocol", "to": "kakao", "label": "LOCO 암호화", "variant": "security" },
     { "id": "core-to-sqlite", "from": "core", "to": "sqlite", "label": "저장 · 조회" },
     { "id": "user-to-web", "from": "user", "to": "web", "label": "브라우저" },

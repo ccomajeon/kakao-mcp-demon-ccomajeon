@@ -1,0 +1,109 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "한눈에 보는 사용 흐름",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-quick-start-20261102-030705/quick-start.html",
+    "legend": {
+      "entries": {
+        "backend": {
+          "label": "서버"
+        },
+        "frontend": {
+          "label": "AI 클라이언트"
+        },
+        "external": {
+          "label": "사용자"
+        },
+        "security": {
+          "label": "사람 승인"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "flow",
+      "label": "설치부터 답변까지"
+    }
+  ],
+  "mainPath": [
+    "install",
+    "register",
+    "request",
+    "approve",
+    "answer"
+  ],
+  "nodes": [
+    {
+      "id": "install",
+      "lane": "flow",
+      "col": 0,
+      "type": "backend",
+      "label": "① 서버에 설치",
+      "sublabel": "휴대폰으로 로그인 승인"
+    },
+    {
+      "id": "register",
+      "lane": "flow",
+      "col": 1,
+      "type": "frontend",
+      "label": "② AI 클라이언트에",
+      "sublabel": "MCP 등록"
+    },
+    {
+      "id": "request",
+      "lane": "flow",
+      "col": 2,
+      "type": "external",
+      "icon": "person",
+      "label": "③ 자연어로 요청",
+      "sublabel": "'개발팀 방 요약해 줘'"
+    },
+    {
+      "id": "approve",
+      "lane": "flow",
+      "col": 3,
+      "type": "security",
+      "label": "④ 처음 쓰는 방은",
+      "sublabel": "사람이 승인"
+    },
+    {
+      "id": "answer",
+      "lane": "flow",
+      "col": 4,
+      "type": "frontend",
+      "icon": "success",
+      "label": "⑤ 결과를 AI가",
+      "sublabel": "정리해서 답변"
+    }
+  ],
+  "edges": [
+    {
+      "id": "install-register",
+      "from": "install",
+      "to": "register",
+      "variant": "emphasis"
+    },
+    {
+      "id": "register-request",
+      "from": "register",
+      "to": "request",
+      "variant": "emphasis"
+    },
+    {
+      "id": "request-approve",
+      "from": "request",
+      "to": "approve",
+      "variant": "emphasis"
+    },
+    {
+      "id": "approve-answer",
+      "from": "approve",
+      "to": "answer",
+      "variant": "emphasis"
+    }
+  ]
+}

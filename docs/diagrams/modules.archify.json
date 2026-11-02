@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "kakao-mcp 모듈 구성",
+    "locale": "ko",
+    "output": ".archify/architecture-modules-20261102-030627/modules.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    }
+  },
+  "components": [
+    { "id": "client", "type": "frontend", "label": "packages/client", "sublabel": "대화 조회 SDK", "pos": [40, 40], "size": [170, 60],
+      "sources": [{ "path": "packages/client/src/mcp-reader.ts", "line": 21, "end_line": 22, "label": "MCP 도구로만 읽는 리더" }] },
+    { "id": "cli", "type": "frontend", "label": "apps/cli", "sublabel": "터미널 메신저 · 명령행", "pos": [330, 40], "size": [170, 60],
+      "sources": [
+        { "path": "apps/cli/package.json", "line": 10, "end_line": 12, "label": "core · client 의존" },
+        { "path": "apps/cli/src/mcp-client.ts", "line": 1, "end_line": 8, "label": "데몬 전용 MCP 클라이언트" }
+      ] },
+    { "id": "mcp", "type": "backend", "label": "apps/mcp", "sublabel": "MCP 서버 · 승인 · 설치", "pos": [330, 220], "size": [170, 60], "tag": "데몬",
+      "sources": [
+        { "path": "apps/mcp/package.json", "line": 17, "end_line": 19, "label": "core · protocol 의존" },
+        { "path": "apps/mcp/src/index.ts", "line": 33, "end_line": 38, "label": "KakaoSession + MCP 서버" },
+        { "path": "apps/mcp/src/register.ts", "line": 27, "end_line": 27, "label": "기기 등록 import" }
+      ] },
+    { "id": "web", "type": "frontend", "label": "apps/web", "sublabel": "로컬 웹 GUI", "pos": [660, 220], "size": [170, 60],
+      "sources": [
+        { "path": "apps/web/src/index.ts", "line": 7, "end_line": 14, "label": "McpBridge · core 헬퍼만" },
+        { "path": "apps/web/src/mcp-bridge.ts", "line": 90, "end_line": 90, "label": "McpBridge" }
+      ] },
+    { "id": "core", "type": "backend", "label": "packages/core", "sublabel": "계정 세션 · 정책 · SQLite", "pos": [330, 400], "size": [170, 60],
+      "sources": [
+        { "path": "packages/core/package.json", "line": 12, "end_line": 13, "label": "protocol 의존" },
+        { "path": "packages/core/src/kakao-session.ts", "line": 1, "end_line": 12, "label": "단일 계정 세션" }
+      ] },
+    { "id": "protocol", "type": "backend", "label": "packages/protocol", "sublabel": "LOCO · 암호화 · 기기 등록", "pos": [330, 580], "size": [170, 60],
+      "sources": [
+        { "path": "packages/protocol/package.json", "line": 11, "end_line": 12, "label": "bson 의존" },
+        { "path": "packages/protocol/src/transport/loco-session.ts", "line": 313, "end_line": 317, "label": "LOCO 연결" }
+      ] },
+    { "id": "bson", "type": "external", "label": "bson", "sublabel": "유일한 런타임 의존성", "pos": [660, 580], "size": [170, 60],
+      "sources": [{ "path": "packages/protocol/package.json", "line": 11, "end_line": 12, "label": "bson ^6.10.1" }] }
+  ],
+  "connections": [
+    { "id": "cli-imports-client", "from": "cli", "to": "client", "label": "import" },
+    { "id": "cli-calls-daemon", "from": "cli", "to": "mcp", "label": "MCP · TCP", "variant": "emphasis" },
+    { "id": "web-calls-daemon", "from": "web", "to": "mcp", "label": "MCP · TCP/SSH", "variant": "emphasis" },
+    { "id": "mcp-uses-core", "from": "mcp", "to": "core", "label": "세션 · 도구 실행", "variant": "emphasis" },
+    { "id": "core-uses-protocol", "from": "core", "to": "protocol", "label": "LOCO 세션", "variant": "emphasis" },
+    { "id": "mcp-registers-device", "from": "mcp", "to": "protocol", "label": "기기 등록 (setup)", "variant": "dashed", "fromSide": "left", "toSide": "left" },
+    { "id": "protocol-uses-bson", "from": "protocol", "to": "bson", "label": "BSON 직렬화" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "실행 앱", "items": ["apps/mcp만 계정 세션을 열고 데몬으로 실행", "apps/cli와 apps/web은 데몬에 MCP로 접속하는 클라이언트", "cli·web은 core에서 설정·오류 같은 헬퍼만 import하고 계정 세션은 열지 않음"] },
+    { "dot": "emerald", "title": "패키지", "items": ["packages/core가 세션·권한·승인·저장을 모두 소유", "packages/protocol은 LOCO 통신과 암호화를 담당", "packages/client는 터미널 메신저가 쓰는 대화 조회 SDK"] }
+  ]
+}

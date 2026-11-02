@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "AI가 메시지를 보낼 때",
+    "locale": "ko",
+    "output": ".archify/sequence-send-flow-20261102-030858/send-flow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    }
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "icon": "person",
+      "label": "사용자",
+      "sublabel": "확인 창에서 승인",
+      "sources": [
+        {
+          "path": "packages/core/src/recipient-permissions.ts",
+          "line": 1,
+          "end_line": 3,
+          "label": "방 전송 허가 · 일일 한도"
+        },
+        {
+          "path": "docs/tool-contract.md",
+          "line": 35,
+          "end_line": 36,
+          "label": "앞으로 묻지 않기"
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "frontend",
+      "label": "AI 클라이언트",
+      "sublabel": "MCP 도구 호출",
+      "sources": [
+        {
+          "path": "apps/mcp/src/tools/agent-messages.ts",
+          "line": 41,
+          "end_line": 54,
+          "label": "send_message 도구"
+        },
+        {
+          "path": "apps/mcp/src/client-approval.ts",
+          "line": 106,
+          "end_line": 128,
+          "label": "확인 창(elicitation)"
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "core",
+      "sublabel": "쓰기 엔진",
+      "sources": [
+        {
+          "path": "packages/core/src/operation-engine.ts",
+          "line": 120,
+          "end_line": 161,
+          "label": "commit: 승인 · WRITE · 결과"
+        },
+        {
+          "path": "packages/core/src/agent-send.ts",
+          "line": 35,
+          "end_line": 92,
+          "label": "msgId · APPROVAL_REQUIRED"
+        },
+        {
+          "path": "packages/core/src/agent-send.ts",
+          "line": 308,
+          "end_line": 333,
+          "label": "시도 기록 · 30초 정리"
+        }
+      ]
+    },
+    {
+      "id": "kakao",
+      "type": "external",
+      "label": "카카오 서버",
+      "sublabel": "LOCO 채팅 서버",
+      "sources": [
+        {
+          "path": "packages/protocol/src/transport/loco-session.ts",
+          "line": 377,
+          "end_line": 398,
+          "label": "WRITE (msgId 포함)"
+        },
+        {
+          "path": "packages/core/src/kakao-session.ts",
+          "line": 1505,
+          "end_line": 1519,
+          "label": "방 기록에서 msgId 찾기"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 222,
+      "label": "요청"
+    },
+    {
+      "from": 226,
+      "to": 424,
+      "label": "이 방에 전송 허가가 없을 때"
+    },
+    {
+      "from": 428,
+      "to": 500,
+      "label": "전송"
+    },
+    {
+      "from": 504,
+      "to": 578,
+      "label": "성공"
+    },
+    {
+      "from": 582,
+      "to": 656,
+      "label": "서버 거절 · 연결 전 실패"
+    },
+    {
+      "from": 660,
+      "to": 850,
+      "label": "응답만 유실"
+    }
+  ],
+  "messages": [
+    {
+      "id": "send-call",
+      "from": "ai",
+      "to": "core",
+      "y": 170,
+      "label": "send_message(requestId=UUID)",
+      "variant": "emphasis",
+      "note": "core가 운영자 상한 · 속도 제한 · pause 확인"
+    },
+    {
+      "id": "ask-dialog",
+      "from": "core",
+      "to": "ai",
+      "y": 244,
+      "label": "확인 창 요청",
+      "variant": "security",
+      "note": "APPROVAL_REQUIRED · 확인 코드 포함"
+    },
+    {
+      "id": "show-text",
+      "from": "ai",
+      "to": "user",
+      "y": 304,
+      "label": "보낼 내용 표시",
+      "variant": "security"
+    },
+    {
+      "id": "approve",
+      "from": "user",
+      "to": "ai",
+      "y": 334,
+      "label": "승인",
+      "variant": "security",
+      "note": "원하면 \"앞으로 묻지 않기\" → 이 방 전송 허가 저장(일일 한도 안)"
+    },
+    {
+      "id": "retry-approved",
+      "from": "ai",
+      "to": "core",
+      "y": 404,
+      "label": "승인 답과 같은 requestId",
+      "variant": "default"
+    },
+    {
+      "id": "write",
+      "from": "core",
+      "to": "kakao",
+      "y": 446,
+      "label": "WRITE",
+      "variant": "emphasis",
+      "note": "requestId에서 만든 msgId로 한 번만 전송"
+    },
+    {
+      "id": "write-ack",
+      "from": "kakao",
+      "to": "core",
+      "y": 522,
+      "label": "전송 완료 (logId)",
+      "variant": "return"
+    },
+    {
+      "id": "sent",
+      "from": "core",
+      "to": "ai",
+      "y": 552,
+      "label": "sent",
+      "variant": "return"
+    },
+    {
+      "id": "not-sent",
+      "from": "core",
+      "to": "ai",
+      "y": 600,
+      "label": "보내지 않음",
+      "variant": "return",
+      "note": "같은 requestId로 다시 보내도 됨"
+    },
+    {
+      "id": "history-search",
+      "from": "core",
+      "to": "kakao",
+      "y": 680,
+      "label": "방 기록에서 msgId 찾기",
+      "variant": "default",
+      "note": "재연결한 뒤 실행"
+    },
+    {
+      "id": "history-page",
+      "from": "kakao",
+      "to": "core",
+      "y": 740,
+      "label": "방 기록 (MCHATLOGS)",
+      "variant": "return"
+    },
+    {
+      "id": "found-sent",
+      "from": "core",
+      "to": "ai",
+      "y": 770,
+      "label": "찾으면 sent",
+      "variant": "return"
+    },
+    {
+      "id": "not-delivered",
+      "from": "core",
+      "to": "ai",
+      "y": 800,
+      "label": "없으면 SEND_NOT_DELIVERED",
+      "variant": "return",
+      "note": "30초가 지나도 기록에 없을 때 · 같은 requestId로만 다시 보냄 · 데몬은 스스로 재전송하지 않음"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "core",
+      "from": 165,
+      "to": 810,
+      "type": "backend"
+    },
+    {
+      "participant": "kakao",
+      "from": 441,
+      "to": 528,
+      "type": "external"
+    },
+    {
+      "participant": "kakao",
+      "from": 675,
+      "to": 746,
+      "type": "external"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "requestId 규칙",
+      "items": [
+        "모든 쓰기에 AI가 정한 UUID requestId가 붙음",
+        "같은 requestId는 같은 msgId로 이어져 중복 전송을 막음",
+        "데몬은 스스로 재전송하지 않고, 불명확한 결과를 새 requestId로 바꾸지 않음"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "승인",
+      "items": [
+        "허가 없는 방은 확인 창(또는 패스키)으로 사람이 승인",
+        "상한 · 속도 제한 · pause는 승인으로도 넘지 못함",
+        "\"앞으로 묻지 않기\"는 그 방 메시지 · 사진만 일일 한도 안에서 허용"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "결과 읽기",
+      "items": [
+        "sent는 서버 응답이며 상대가 읽었다는 증명은 아님",
+        "아직 판단할 수 없으면 SEND_OUTCOME_UNKNOWN: 나중에 같은 requestId로 다시 호출해 정리된 결과를 받음",
+        "SEND_NOT_DELIVERED 뒤에는 같은 requestId로 다시 보낼 수 있음"
+      ]
+    }
+  ]
+}

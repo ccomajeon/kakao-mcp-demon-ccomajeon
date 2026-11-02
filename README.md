@@ -38,13 +38,10 @@ AI는 허용된 대화를 읽고 메시지를 보낼 수 있고, 사람은 방�
 | **어떻게 지키나요?** | 처음 쓰는 방의 읽기·전송은 사람이 승인합니다. 운영자 상한·속도 제한은 사람 승인으로도 넘을 수 없습니다. |
 | **현재 상태** | 버전 `0.2.0-rebuild.3` · 기본 도구 16개 · 전체 도구 41개 · 실제 계정 송수신은 아직 미검증 |
 
-```mermaid
-flowchart LR
-    A["① 서버에 설치<br/>휴대폰으로 로그인 승인"] --> B["② AI 클라이언트에<br/>MCP 등록"]
-    B --> C["③ 자연어로 요청<br/>'개발팀 방 요약해 줘'"]
-    C --> D["④ 처음 쓰는 방은<br/>사람이 승인"]
-    D --> E["⑤ 결과를 AI가<br/>정리해서 답변"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/quick-start-dark.png">
+  <img alt="설치부터 답변까지 5단계: ① 서버에 설치·휴대폰으로 로그인 승인 → ② AI 클라이언트에 MCP 등록 → ③ 자연어로 요청 → ④ 처음 쓰는 방은 사람이 승인 → ⑤ 결과를 AI가 정리해서 답변" src="docs/diagrams/quick-start-light.png">
+</picture>
 
 ---
 
@@ -57,44 +54,8 @@ flowchart LR
   <img alt="kakao-mcp 전체 구조: 사용자 → AI 클라이언트 → MCP 커넥터 → SSH 터널 → 서버의 MCP 서버 → core → protocol → 카카오톡 서버. core는 SQLite에 저장하고, 웹 화면과 터미널 CLI도 같은 MCP 서버에 연결합니다." src="docs/diagrams/architecture-light.png">
 </picture>
 
-<sub>[archify](https://github.com/tt-a1i/archify)로 코드 근거를 붙여 그린 구조도입니다. 노드마다 근거 코드 링크가 달린 인터랙티브 버전은 [`docs/diagrams/architecture.html`](docs/diagrams/architecture.html)을 내려받아 브라우저로 열어 보세요. 원본 정의는 [`architecture.archify.json`](docs/diagrams/architecture.archify.json)입니다.</sub>
+<sub>[archify](https://github.com/tt-a1i/archify)로 코드 근거를 붙여 그린 구조도입니다. 노드마다 근거 코드 링크가 달린 인터랙티브 버전은 [`docs/diagrams/architecture.html`](docs/diagrams/architecture.html)을 내려받아 브라우저로 열어 보세요. 이 README의 다른 다이어그램도 모두 archify로 그렸고, 원본 정의(`*.archify.json`)는 [`docs/diagrams`](docs/diagrams)에 있습니다.</sub>
 
-<details>
-<summary><b>Mermaid 버전 보기</b></summary>
-
-```mermaid
-flowchart TB
-    subgraph PC["🧑‍💻 사용하는 컴퓨터"]
-        direction TB
-        AI["🤖 AI 클라이언트<br/>Claude · Codex 등"]
-        CONN["🔌 MCP 커넥터<br/>stdio ↔ 소켓 중계"]
-        WEBUI["🌐 웹 화면<br/>127.0.0.1:8899"]
-        BROWSER["브라우저"]
-        AI -- "stdio<br/>JSON-RPC" --> CONN
-        BROWSER -- "REST + SSE" --> WEBUI
-    end
-
-    subgraph SERVER["🖥 Linux 서버 · kakao-mcp.service"]
-        direction TB
-        MCP["📡 MCP 서버<br/>127.0.0.1:8787"]
-        CORE["🛡 core<br/>세션 · 권한 · 승인 · 쓰기 엔진"]
-        DB[("🗄 SQLite<br/>/var/lib/kakao-mcp")]
-        PROTO["🔐 protocol<br/>LOCO · BSON · 암호화"]
-        CLI["⌨️ 터미널 CLI"]
-        MCP --> CORE
-        CLI -- "loopback TCP" --> MCP
-        CORE <--> DB
-        CORE --> PROTO
-    end
-
-    KAKAO["☁️ 카카오톡 서버"]
-
-    CONN == "SSH 터널<br/>(ssh -W)" ==> MCP
-    WEBUI == "SSH 터널" ==> MCP
-    PROTO <== "LOCO<br/>RSA + AES-GCM" ==> KAKAO
-```
-
-</details>
 
 > 💡 AI가 같은 서버에 있으면 SSH 없이 `127.0.0.1:8787`로 바로 연결합니다. MCP 포트는 서버 밖으로 열지 않습니다.
 
@@ -102,23 +63,10 @@ flowchart TB
 
 TypeScript와 Node.js로 만든 npm workspaces 모노레포입니다. 아래쪽 패키지일수록 카카오 서버에 가깝습니다.
 
-```mermaid
-flowchart TB
-    subgraph APPS["apps — 실행 프로그램"]
-        direction LR
-        M["apps/mcp<br/>MCP 도구 · 승인 · 설치 · SSH 커넥터"]
-        C["apps/cli<br/>터미널 메신저 · 명령행"]
-        W["apps/web<br/>로컬 웹 화면 · API"]
-    end
-    CL["packages/client<br/>데몬 연결용 클라이언트 SDK"]
-    CO["packages/core<br/>단일 계정 세션 · SQLite · 접근 정책 · 승인 · 이벤트"]
-    PR["packages/protocol<br/>LOCO/BSON · 암호화 · 기기 등록 · 미디어 송수신"]
-
-    C --> CL
-    W --> CL
-    CL -. "MCP over 소켓" .-> M
-    M --> CO --> PR
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/modules-dark.png">
+  <img alt="모듈 구성: apps/cli는 packages/client를 import하고 apps/mcp 데몬에 MCP로 접속, apps/web도 MCP로 데몬에 접속, apps/mcp는 packages/core를 거쳐 packages/protocol을 쓰고 setup 때 기기 등록에 protocol을 직접 사용, protocol은 bson에 의존" src="docs/diagrams/modules-light.png">
+</picture>
 
 | 디렉터리 | 역할 |
 |---|---|
@@ -182,28 +130,10 @@ AI 클라이언트와 데몬은 한 줄에 JSON 하나씩 주고받습니다. �
 
 사람이 설치 마법사에서 계정 정보를 입력하고, **휴대폰에서 기기 인증을 직접 승인**합니다. 이후로는 데몬이 연결을 계속 유지합니다.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 🧑 사용자
-    participant S as 설치 마법사<br/>(kakao-mcp setup)
-    participant P as protocol
-    participant K as 카카오 서버
-    participant PH as 📱 휴대폰
-
-    U->>S: 계정·비밀번호 입력 (터미널, 숨김 입력)
-    S->>P: 로그인 · 기기 등록 요청
-    P->>K: 로그인 · 기기 등록
-    K-->>PH: 기기 인증 요청
-    U->>PH: 직접 승인
-    K-->>P: 인증 완료 · 토큰
-    P->>K: 부킹 서버 설정 조회 (GETCONF)
-    P->>K: 채팅 서버 배정 (CHECKIN)
-    P->>K: 암호화 핸드셰이크 (RSA-OAEP → AES-128-GCM)
-    P->>K: LOGINLIST (세션 시작 · 방 목록 수신)
-    S->>S: systemd 서비스 등록·시작 (사람 승인 후)
-    Note over S,K: 이후 kakao-mcp.service가 연결을 유지하고 PING으로 살아 있음을 확인
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/login-flow-dark.png">
+  <img alt="설치·로그인 시퀀스: 사용자가 설치 마법사에 계정 입력 → protocol이 카카오 서버에 로그인·기기 등록 → 휴대폰에서 직접 승인 → 토큰·기기 키 수신 → systemd 서비스 시작 → 데몬이 GETCONF, CHECKIN, 암호화 핸드셰이크, LOGINLIST로 세션 연결" src="docs/diagrams/login-flow-light.png">
+</picture>
 
 - 다른 PC가 이미 쓰고 있으면 기본으로 **중단**하고, 자동으로 로그아웃시키지 않습니다.
 - 자동 재로그인 정보 저장은 선택입니다. 저장하더라도 최대 24시간에 3회로 제한하고, 추가 인증이 필요하면 멈춥니다.
@@ -212,81 +142,31 @@ sequenceDiagram
 
 처음 여는 방(닫힌 방)이면 **같은 호출 안에서** 사람에게 확인 창을 띄웁니다.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 🧑 사용자
-    participant AI as 🤖 AI 클라이언트
-    participant D as 데몬 (MCP 서버)
-    participant C as core
-    participant K as 카카오 서버
-
-    U->>AI: "개발팀 방의 최근 대화 요약해 줘"
-    AI->>D: find_chat("개발팀")
-    D->>C: 방 검색 (메타데이터)
-    C-->>AI: 후보 방 목록
-    AI->>D: read_messages(chatId, recent)
-    D->>C: 읽기 권한 확인
-    alt 방 규칙이 deny/manual (ask 기본)
-        C-->>AI: 확인 창 요청 (MCP elicitation)
-        AI-->>U: "이 방을 읽을까요?"
-        U->>AI: 이번만 허용 / 앞으로 묻지 않기
-        AI->>D: 승인 응답
-    end
-    C->>K: 필요한 기록 동기화 (SYNCMSG 등)
-    C-->>AI: 메시지 (untrusted 표시)
-    AI-->>U: 요약 결과
-    Note over C: 읽기만 했으므로 읽음 표시는 보내지 않음
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/read-flow-dark.png">
+  <img alt="대화 읽기 시퀀스: AI가 find_chat과 read_messages 호출 → core가 읽기 권한 확인 → 닫힌 방이면 같은 호출 안에서 확인 창으로 사람 승인 → 필요하면 MCHATLOGS로 기록 동기화 → untrusted 표시된 메시지 반환, 읽음 표시는 보내지 않음" src="docs/diagrams/read-flow-light.png">
+</picture>
 
 ### 3. AI가 메시지를 보낼 때
 
 모든 쓰기 작업에는 AI가 정한 <b>UUID <code>requestId</code></b>가 붙습니다. 결과가 불확실할 때 같은 ID로 확인하므로 **중복 전송이 일어나지 않습니다.**
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 🧑 사용자
-    participant AI as 🤖 AI 클라이언트
-    participant C as core (쓰기 엔진)
-    participant K as 카카오 서버
-
-    AI->>C: send_message(chatId, text, requestId=UUID)
-    C->>C: 상한 · 속도 제한 · pause 확인
-    alt 이 방에 전송 허가 없음
-        C-->>AI: 확인 창 요청
-        AI-->>U: 보낼 내용 표시
-        U->>AI: 승인 (원하면 "앞으로 묻지 않기")
-    end
-    C->>K: WRITE
-    alt 성공
-        K-->>C: 전송 완료
-        C-->>AI: ✅ sent
-    else 서버 거절 · 연결 전 실패
-        C-->>AI: ❌ 보내지 않음 → 같은 requestId로 재시도 가능
-    else 응답만 유실
-        C->>K: 재연결 후 방 기록에서 해당 메시지 탐색
-        C-->>AI: 찾으면 sent / 30초 뒤에도 없으면 SEND_NOT_DELIVERED
-    end
-    Note over AI,C: 데몬은 스스로 재전송하지 않고,<br/>불명확한 결과를 새 requestId로 바꾸지 않음
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/send-flow-dark.png">
+  <img alt="메시지 전송 시퀀스: AI가 send_message(requestId) 호출 → 전송 허가가 없으면 확인 창으로 승인 → core가 WRITE 한 번 전송 → 성공이면 sent, 서버 거절이면 보내지 않음, 응답만 유실되면 재연결 후 방 기록에서 msgId를 찾아 sent 또는 SEND_NOT_DELIVERED" src="docs/diagrams/send-flow-light.png">
+</picture>
 
 ### 4. 새 메시지를 받을 때
 
-```mermaid
-flowchart LR
-    K["☁️ 카카오 서버"] -- "MSG 푸시" --> P["protocol"]
-    P --> C["core"]
-    C --> DB[("SQLite 저장<br/>(방 규칙과 무관하게 저장)")]
-    C --> BUF["원형 버퍼<br/>실시간 이벤트"]
-    BUF -- "read_messages(wait)<br/>claim/ack_message_events" --> AI["🤖 AI"]
-    BUF -- "SSE" --> WEB["🌐 웹 화면"]
-    BUF -- "이벤트" --> TUI["⌨️ 터미널 메신저"]
-    C -. "resources/updated<br/>(본문 없는 변경 알림)" .-> AI
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/receive-flow-dark.png">
+  <img alt="수신 데이터 흐름: 카카오 서버 MSG 푸시 → protocol → core → SQLite 저장과 원형 버퍼 → AI는 read_messages wait와 claim/ack 이벤트로, 터미널 메신저는 recent 이벤트로 받고, 웹 화면은 SSE 상태 알림만 받음, AI에는 본문 없는 resources/updated 알림" src="docs/diagrams/receive-flow-light.png">
+</picture>
 
 - **저장과 열람은 별개입니다.** 수신 메시지는 모두 로컬 SQLite에 저장되지만, AI가 읽으려면 읽기 권한을 다시 통과해야 합니다.
 - 변경 알림(`kakao://rooms/{chatId}/messages` 구독)에는 본문·작성자를 담지 않습니다. 본문은 항상 `read_messages`로 읽습니다.
+- 웹 화면의 SSE는 연결·방 목록 같은 상태 알림만 보내고 메시지 본문은 보내지 않습니다. 본문은 방 기록을 조회해 읽습니다.
+- `claim/ack_message_events`는 재시작에도 남는 SQLite 이벤트 큐를, `read_messages`의 wait·recent는 메모리의 원형 버퍼를 읽습니다.
 
 ---
 
@@ -294,20 +174,10 @@ flowchart LR
 
 요청은 아래 순서로 검사하고, **하나라도 거절하면 멈춥니다.**
 
-```mermaid
-flowchart TD
-    REQ(["AI의 도구 호출"]) --> L0{"레이어 0 · 고정 바닥선<br/>절대 안 되는 작업인가?"}
-    L0 -- 예 --> DENY["⛔ 거절"]
-    L0 -- 아니오 --> L2{"레이어 2 · 도구 묶음<br/>이 도구가 켜져 있나?"}
-    L2 -- 아니오 --> DENY
-    L2 -- 예 --> L14{"레이어 1·4 · 모드 + 운영자 상한<br/>ROOM_CEILING · 속도 제한 · pause"}
-    L14 -- 초과 --> DENY
-    L14 -- 범위 안 --> L5{"레이어 5 · 사람의 허가<br/>방 허가 · 읽기 허가 · 작업 허가"}
-    L5 -- 있음 --> RUN["✅ 실행"]
-    L5 -- 없음 --> ASK["🙋 확인 창 / 패스키로 사람에게 질문"]
-    ASK -- 승인 --> RUN
-    ASK -- 거절 --> DENY
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/permission-check-dark.png">
+  <img alt="권한 검사 순서: 레이어 0 고정 바닥선 → 레이어 2 도구 묶음 → 레이어 1·4 모드와 운영자 상한 → 레이어 5 사람의 허가, 허가가 없으면 확인 창·패스키로 질문, 어느 단계든 거절이면 멈춤" src="docs/diagrams/permission-check-light.png">
+</picture>
 
 | 레이어 | 질문 | 설정 |
 |---|---|---|
@@ -352,10 +222,10 @@ flowchart TD
 
 ## 설치와 사용법
 
-```mermaid
-flowchart LR
-    S1["1️⃣ 서버에<br/>패키지 설치"] --> S2["2️⃣ 휴대폰으로<br/>로그인 승인"] --> S3["3️⃣ AI 클라이언트<br/>연결"] --> S4["4️⃣ 웹·터미널에서<br/>사용"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/install-steps-dark.png">
+  <img alt="설치 4단계: 서버에 패키지 설치 → 휴대폰으로 로그인 승인 → AI 클라이언트 연결 → 웹·터미널에서 사용" src="docs/diagrams/install-steps-light.png">
+</picture>
 
 > [!NOTE]
 > 이 버전은 npm 레지스트리에 게시하지 않았습니다. 아래 명령은 로컬 패키지 `kakao-mcp-ccomajeon-0.2.0-rebuild.3.tgz`를 사용합니다. 파일이 없다면 먼저 [소스 개발과 패키지 빌드](#소스-개발과-패키지-빌드)의 명령으로 만드세요.

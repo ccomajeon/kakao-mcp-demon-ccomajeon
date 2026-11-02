@@ -1,0 +1,358 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "처음 설치하고 로그인할 때",
+    "locale": "ko",
+    "output": ".archify/sequence-login-flow-20261102-030822/login-flow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    },
+    "legend": {
+      "entries": {
+        "dashed": {
+          "label": "비동기 알림"
+        }
+      }
+    }
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "icon": "person",
+      "label": "사용자",
+      "sublabel": "터미널 · 휴대폰",
+      "sources": [
+        {
+          "path": "docs/QUICKSTART.md",
+          "line": 16,
+          "end_line": 18,
+          "label": "숨김 입력 · 휴대폰 직접 승인"
+        }
+      ]
+    },
+    {
+      "id": "wizard",
+      "type": "frontend",
+      "label": "설치 마법사",
+      "sublabel": "kakao-mcp setup",
+      "sources": [
+        {
+          "path": "apps/mcp/src/setup.ts",
+          "line": 107,
+          "end_line": 116,
+          "label": "새 Linux 서버 설치 선택"
+        },
+        {
+          "path": "apps/mcp/src/setup-system.ts",
+          "line": 234,
+          "end_line": 263,
+          "label": "계정 입력 · 등록 · -101 중단"
+        },
+        {
+          "path": "apps/mcp/src/setup-system.ts",
+          "line": 296,
+          "end_line": 308,
+          "label": "승인 후 systemctl enable --now"
+        }
+      ]
+    },
+    {
+      "id": "daemon",
+      "type": "backend",
+      "label": "데몬",
+      "sublabel": "kakao-mcp.service",
+      "sources": [
+        {
+          "path": "packages/core/src/kakao-session.ts",
+          "line": 198,
+          "end_line": 215,
+          "label": "단일 LOCO 세션 · PING 30초"
+        }
+      ]
+    },
+    {
+      "id": "protocol",
+      "type": "backend",
+      "label": "protocol",
+      "sublabel": "계정 인증 · LOCO",
+      "sources": [
+        {
+          "path": "packages/protocol/src/authentication/device-registration.ts",
+          "line": 100,
+          "end_line": 222,
+          "label": "login → request_sign → confirm_sign"
+        },
+        {
+          "path": "packages/protocol/src/transport/loco-session.ts",
+          "line": 313,
+          "end_line": 355,
+          "label": "핸드셰이크 + LOGINLIST"
+        },
+        {
+          "path": "packages/protocol/src/crypto/loco-crypto.ts",
+          "line": 18,
+          "end_line": 25,
+          "label": "RSA-OAEP + AES-128-GCM"
+        }
+      ]
+    },
+    {
+      "id": "kakao",
+      "type": "external",
+      "label": "카카오 서버",
+      "sublabel": "계정 API · LOCO",
+      "sources": [
+        {
+          "path": "packages/protocol/src/transport/loco-client.ts",
+          "line": 80,
+          "end_line": 93,
+          "label": "부킹 서버 GETCONF"
+        },
+        {
+          "path": "packages/protocol/src/transport/loco-session.ts",
+          "line": 1383,
+          "end_line": 1413,
+          "label": "CHECKIN 배정 후 연결"
+        }
+      ]
+    },
+    {
+      "id": "phone",
+      "type": "external",
+      "label": "휴대폰",
+      "sublabel": "카카오톡 앱",
+      "sources": [
+        {
+          "path": "apps/mcp/src/setup-system.ts",
+          "line": 392,
+          "end_line": 393,
+          "label": "휴대폰 승인 안내"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 158,
+      "to": 486,
+      "label": "계정 입력 · 기기 등록"
+    },
+    {
+      "from": 514,
+      "to": 604,
+      "label": "서비스 시작"
+    },
+    {
+      "from": 628,
+      "to": 880,
+      "label": "LOCO 연결 유지"
+    }
+  ],
+  "messages": [
+    {
+      "id": "enter-account",
+      "from": "user",
+      "to": "wizard",
+      "y": 192,
+      "label": "계정·비밀번호 입력",
+      "variant": "emphasis",
+      "note": "터미널 숨김 입력, 화면·명령 인자에 남기지 않음"
+    },
+    {
+      "id": "register-request",
+      "from": "wizard",
+      "to": "protocol",
+      "y": 250,
+      "label": "로그인 · 기기 등록 요청",
+      "variant": "emphasis"
+    },
+    {
+      "id": "account-login",
+      "from": "protocol",
+      "to": "kakao",
+      "y": 278,
+      "label": "로그인 · 기기 등록",
+      "variant": "emphasis"
+    },
+    {
+      "id": "approval-push",
+      "from": "kakao",
+      "to": "phone",
+      "y": 306,
+      "label": "기기 인증 요청",
+      "variant": "dashed"
+    },
+    {
+      "id": "user-approves",
+      "from": "user",
+      "to": "phone",
+      "y": 334,
+      "label": "직접 승인",
+      "variant": "security"
+    },
+    {
+      "id": "tokens-issued",
+      "from": "kakao",
+      "to": "protocol",
+      "y": 362,
+      "label": "인증 완료 · 토큰",
+      "variant": "return",
+      "note": "confirm_sign 확인 후 다시 로그인해 토큰 발급"
+    },
+    {
+      "id": "tokens-to-wizard",
+      "from": "protocol",
+      "to": "wizard",
+      "y": 420,
+      "label": "토큰 · 기기 키",
+      "variant": "return",
+      "note": "다른 PC 사용 중(-101)이면 기본은 중단, 자동 로그아웃 없음. 재로그인 정보 저장은 선택, 24시간 3회까지"
+    },
+    {
+      "id": "start-service",
+      "from": "wizard",
+      "to": "daemon",
+      "y": 530,
+      "label": "systemd 서비스 등록·시작",
+      "variant": "emphasis",
+      "note": "사람이 승인한 뒤 systemctl enable --now"
+    },
+    {
+      "id": "open-loco",
+      "from": "daemon",
+      "to": "protocol",
+      "y": 590,
+      "label": "LOCO 연결 열기",
+      "variant": "default"
+    },
+    {
+      "id": "getconf",
+      "from": "protocol",
+      "to": "kakao",
+      "y": 644,
+      "label": "부킹 설정 조회 (GETCONF)",
+      "variant": "default"
+    },
+    {
+      "id": "checkin",
+      "from": "protocol",
+      "to": "kakao",
+      "y": 672,
+      "label": "채팅 서버 배정 (CHECKIN)",
+      "variant": "default"
+    },
+    {
+      "id": "handshake",
+      "from": "protocol",
+      "to": "kakao",
+      "y": 700,
+      "label": "암호화 핸드셰이크",
+      "variant": "security",
+      "note": "RSA-OAEP로 AES-128-GCM 키 전달"
+    },
+    {
+      "id": "loginlist",
+      "from": "protocol",
+      "to": "kakao",
+      "y": 756,
+      "label": "LOGINLIST (세션 시작)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "room-list",
+      "from": "kakao",
+      "to": "protocol",
+      "y": 784,
+      "label": "방 목록",
+      "variant": "return"
+    },
+    {
+      "id": "session-ready",
+      "from": "protocol",
+      "to": "daemon",
+      "y": 812,
+      "label": "세션 연결됨",
+      "variant": "return",
+      "note": "이후 kakao-mcp.service가 연결을 유지하고 PING으로 살아 있음을 확인"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "wizard",
+      "from": 187,
+      "to": 536,
+      "type": "frontend"
+    },
+    {
+      "participant": "protocol",
+      "from": 245,
+      "to": 426,
+      "type": "backend"
+    },
+    {
+      "participant": "kakao",
+      "from": 273,
+      "to": 368,
+      "type": "external"
+    },
+    {
+      "participant": "phone",
+      "from": 301,
+      "to": 340,
+      "type": "external"
+    },
+    {
+      "participant": "daemon",
+      "from": 525,
+      "to": 870,
+      "type": "backend"
+    },
+    {
+      "participant": "protocol",
+      "from": 585,
+      "to": 818,
+      "type": "backend"
+    },
+    {
+      "participant": "kakao",
+      "from": 639,
+      "to": 790,
+      "type": "external"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "사람이 직접 하는 일",
+      "items": [
+        "계정·비밀번호는 터미널 숨김 입력",
+        "새 기기는 휴대폰에서 직접 승인",
+        "서비스 등록·시작도 사람 확인 후 진행"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "멈추는 경우",
+      "items": [
+        "다른 PC가 쓰고 있으면 기본은 중단, 자동 로그아웃 없음",
+        "자동 재로그인은 선택이며 24시간 3회 제한",
+        "추가 인증이 필요하면 멈춤"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "연결 유지",
+      "items": [
+        "GETCONF → CHECKIN → 핸드셰이크 → LOGINLIST",
+        "연결 후 PING으로 생존 확인",
+        "끊기면 같은 순서로 다시 연결"
+      ]
+    }
+  ]
+}

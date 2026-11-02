@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "AI가 대화를 읽을 때",
+    "locale": "ko",
+    "output": ".archify/sequence-read-flow-20261102-030822/read-flow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    }
+  },
+  "participants": [
+    { "id": "user", "type": "external", "icon": "person", "label": "사용자", "sublabel": "요청 · 승인",
+      "sources": [
+        { "path": "docs/tool-contract.md", "line": 46, "end_line": 50, "label": "이번만 · 앞으로 묻지 않기" },
+        { "path": "apps/mcp/src/client-approval.ts", "line": 112, "end_line": 120, "label": "확인 코드 · 기억 선택" }
+      ] },
+    { "id": "ai", "type": "external", "label": "AI 클라이언트", "sublabel": "Claude · Codex 등",
+      "sources": [{ "path": "docs/tool-contract.md", "line": 12, "end_line": 14, "label": "find_chat · read_messages" }] },
+    { "id": "daemon", "type": "backend", "label": "데몬", "sublabel": "MCP 서버",
+      "sources": [
+        { "path": "apps/mcp/src/tools/core-read.ts", "line": 42, "end_line": 66, "label": "닫힌 방 askToRead" },
+        { "path": "apps/mcp/src/mcp-stdio.ts", "line": 181, "end_line": 190, "label": "elicitation/create" },
+        { "path": "apps/mcp/src/untrusted.ts", "line": 15, "end_line": 35, "label": "markUntrusted" }
+      ] },
+    { "id": "core", "type": "backend", "label": "core", "sublabel": "권한 · 저장 · 세션",
+      "sources": [
+        { "path": "packages/core/src/room-access.ts", "line": 101, "end_line": 132, "label": "RoomAccessPolicy · ask 기본 deny" },
+        { "path": "packages/core/src/room-access.ts", "line": 196, "end_line": 208, "label": "일회성 읽기 허가" },
+        { "path": "packages/core/src/kakao-session.ts", "line": 792, "end_line": 822, "label": "MCHATLOGS 기록 보충" }
+      ] },
+    { "id": "kakao", "type": "external", "label": "카카오 서버", "sublabel": "LOCO",
+      "sources": [{ "path": "packages/protocol/src/transport/loco-session.ts", "line": 419, "end_line": 433, "label": "MCHATLOGS" }] }
+  ],
+  "segments": [
+    { "from": 158, "to": 322, "label": "방 찾기" },
+    { "from": 350, "to": 452, "label": "읽기 권한 확인" },
+    { "from": 480, "to": 708, "label": "닫힌 방(deny·manual)일 때만" },
+    { "from": 736, "to": 960, "label": "기록 조회 · 응답" }
+  ],
+  "messages": [
+    { "id": "ask-summary", "from": "user", "to": "ai", "y": 192, "label": "\"개발팀 방 최근 대화 요약해 줘\"", "variant": "emphasis" },
+    { "id": "find-chat", "from": "ai", "to": "daemon", "y": 220, "label": "find_chat(\"개발팀\")", "variant": "default" },
+    { "id": "search-rooms", "from": "daemon", "to": "core", "y": 248, "label": "방 검색 (메타데이터)", "variant": "default",
+      "note": "제목·참여자만 찾고 메시지는 읽지 않음" },
+    { "id": "candidates", "from": "daemon", "to": "ai", "y": 306, "label": "후보 방 목록", "variant": "return" },
+    { "id": "read-messages", "from": "ai", "to": "daemon", "y": 366, "label": "read_messages(chatId, recent)", "variant": "emphasis" },
+    { "id": "check-access", "from": "daemon", "to": "core", "y": 394, "label": "읽기 권한 확인", "variant": "security",
+      "note": "ask 모드에서 규칙 없는 방은 deny" },
+    { "id": "elicit", "from": "daemon", "to": "ai", "y": 496, "label": "확인 창 요청 (elicitation)", "variant": "security",
+      "note": "같은 호출 안에서 묻고, 120초 안에 답이 없으면 취소" },
+    { "id": "ask-person", "from": "ai", "to": "user", "y": 556, "label": "\"이 방을 읽을까요?\"", "variant": "security" },
+    { "id": "person-answers", "from": "user", "to": "ai", "y": 584, "label": "이번만 허용 / 앞으로 묻지 않기", "variant": "security",
+      "note": "이번만: 일회성 허가(1회·10분), 방 규칙 유지. 앞으로: 방 규칙을 immediate로" },
+    { "id": "approval-reply", "from": "ai", "to": "daemon", "y": 662, "label": "승인 응답", "variant": "return" },
+    { "id": "grant", "from": "daemon", "to": "core", "y": 690, "label": "읽기 허가 기록", "variant": "security" },
+    { "id": "sync-history", "from": "core", "to": "kakao", "y": 752, "label": "필요한 기록 동기화 (MCHATLOGS)", "variant": "default",
+      "note": "로컬 기록이 부족할 때만 서버에서 보충" },
+    { "id": "history-logs", "from": "kakao", "to": "core", "y": 808, "label": "메시지 로그", "variant": "return" },
+    { "id": "messages-to-daemon", "from": "core", "to": "daemon", "y": 836, "label": "메시지", "variant": "return",
+      "note": "읽기만 했으므로 읽음 표시는 보내지 않음" },
+    { "id": "messages-to-ai", "from": "daemon", "to": "ai", "y": 892, "label": "메시지 (untrusted 표시)", "variant": "return",
+      "note": "본문은 지시가 아닌 데이터로 표시" },
+    { "id": "summary", "from": "ai", "to": "user", "y": 948, "label": "요약 결과", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "ai", "from": 187, "to": 954, "type": "external" },
+    { "participant": "daemon", "from": 215, "to": 312, "type": "backend" },
+    { "participant": "core", "from": 243, "to": 290, "type": "backend" },
+    { "participant": "daemon", "from": 361, "to": 898, "type": "backend" },
+    { "participant": "core", "from": 389, "to": 436, "type": "backend" },
+    { "participant": "core", "from": 685, "to": 842, "type": "backend" },
+    { "participant": "kakao", "from": 747, "to": 814, "type": "external" }
+  ],
+  "cards": [
+    { "dot": "rose", "title": "닫힌 방", "items": ["ask 모드에서 규칙 없는 방은 deny", "deny·manual 방은 같은 호출 안에서 사람에게 확인", "확인 창이 없는 클라이언트는 APPROVAL_REQUIRED의 requestId로 승인 후 다시 호출"] },
+    { "dot": "emerald", "title": "허가 범위", "items": ["이번만: 일회성 읽기 허가, 방 규칙은 그대로", "앞으로 묻지 않기: 방 규칙을 immediate로", "decline이면 거절로 기록"] },
+    { "dot": "amber", "title": "읽은 내용", "items": ["메시지는 untrusted로 표시되어 지시로 따르지 않음", "읽기는 읽음 표시를 보내지 않음"] }
+  ]
+}

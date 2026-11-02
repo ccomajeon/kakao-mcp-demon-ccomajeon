@@ -1,0 +1,335 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "권한 검사 순서",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-permission-check-20261102-030705/permission-check.html",
+    "repository": {
+      "url": "https://github.com/ccomajeon/kakao-mcp-demon-ccomajeon",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b0ddc053e30a7e23a9a6e5cf8b59190046544c7f"
+    },
+    "legend": {
+      "entries": {
+        "external": {
+          "label": "AI 요청"
+        },
+        "security": {
+          "label": "검사 · 거절"
+        },
+        "frontend": {
+          "label": "사람 확인"
+        },
+        "backend": {
+          "label": "실행"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "checks",
+      "label": "데몬 · 순서대로 검사"
+    },
+    {
+      "id": "person",
+      "label": "사람의 허가"
+    },
+    {
+      "id": "stop",
+      "label": "멈춤",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "call",
+    "floor",
+    "groups",
+    "ceiling",
+    "grants",
+    "run"
+  ],
+  "nodes": [
+    {
+      "id": "call",
+      "lane": "checks",
+      "col": 0,
+      "type": "external",
+      "icon": "start",
+      "label": "AI의 도구 호출",
+      "sublabel": "tools/call",
+      "sources": [
+        {
+          "path": "docs/designs/agent-mode-and-layers.md",
+          "line": 41,
+          "end_line": 41,
+          "label": "검사 순서 0 → 2 → 1·4 → 5"
+        }
+      ]
+    },
+    {
+      "id": "floor",
+      "lane": "checks",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "레이어 0 · 고정 바닥선",
+      "sublabel": "절대 안 되는 작업인가?",
+      "tag": "코드 고정",
+      "sources": [
+        {
+          "path": "docs/designs/agent-mode-and-layers.md",
+          "line": 93,
+          "end_line": 104,
+          "label": "고정 바닥선(두 모드 공통)"
+        },
+        {
+          "path": "packages/core/src/agent-mode.ts",
+          "line": 1,
+          "end_line": 6,
+          "label": "MCP 도구로 모드 변경 불가"
+        }
+      ]
+    },
+    {
+      "id": "groups",
+      "lane": "checks",
+      "col": 2,
+      "type": "security",
+      "icon": "decision",
+      "label": "레이어 2 · 도구 묶음",
+      "sublabel": "이 도구가 켜져 있나?",
+      "tag": "KAKAO_MCP_TOOL_GROUPS",
+      "sources": [
+        {
+          "path": "docs/tool-contract.md",
+          "line": 53,
+          "end_line": 56,
+          "label": "꺼진 묶음은 목록·호출 모두 없음"
+        },
+        {
+          "path": "apps/mcp/src/mcp-stdio.ts",
+          "line": 130,
+          "end_line": 135,
+          "label": "꺼진 묶음 도구는 등록 안 함"
+        },
+        {
+          "path": "apps/mcp/src/optional-modules.ts",
+          "line": 63,
+          "end_line": 69,
+          "label": "checkToolGroups"
+        }
+      ]
+    },
+    {
+      "id": "ceiling",
+      "lane": "checks",
+      "col": 3,
+      "type": "security",
+      "icon": "decision",
+      "label": "레이어 1·4 · 모드 + 운영자 상한",
+      "sublabel": "ROOM_CEILING · 속도 제한 · pause",
+      "sources": [
+        {
+          "path": "packages/core/src/agent-mode.ts",
+          "line": 8,
+          "end_line": 24,
+          "label": "ask/trust 기본값"
+        },
+        {
+          "path": "packages/core/src/policy.ts",
+          "line": 152,
+          "end_line": 163,
+          "label": "pause → 상한 → 속도 제한"
+        },
+        {
+          "path": "packages/core/src/room-access.ts",
+          "line": 253,
+          "end_line": 257,
+          "label": "읽기도 상한 먼저"
+        }
+      ],
+      "width": 224
+    },
+    {
+      "id": "grants",
+      "lane": "checks",
+      "col": 4,
+      "type": "security",
+      "icon": "decision",
+      "label": "레이어 5 · 사람의 허가",
+      "sublabel": "방 허가 · 읽기 허가 · 작업 허가",
+      "sources": [
+        {
+          "path": "docs/designs/agent-mode-and-layers.md",
+          "line": 39,
+          "end_line": 39,
+          "label": "허가 레코드"
+        },
+        {
+          "path": "docs/tool-contract.md",
+          "line": 64,
+          "end_line": 71,
+          "label": "권한 두 층"
+        },
+        {
+          "path": "packages/core/src/room-access.ts",
+          "line": 258,
+          "end_line": 264,
+          "label": "방 규칙 · 읽기 허가 확인"
+        }
+      ]
+    },
+    {
+      "id": "run",
+      "lane": "checks",
+      "col": 5,
+      "type": "backend",
+      "icon": "success",
+      "label": "실행",
+      "sources": [
+        {
+          "path": "packages/core/src/policy.ts",
+          "line": 165,
+          "end_line": 168,
+          "label": "승인 확인 뒤 authorize"
+        }
+      ]
+    },
+    {
+      "id": "ask",
+      "lane": "person",
+      "col": 4,
+      "type": "frontend",
+      "icon": "person",
+      "label": "사람에게 질문",
+      "sublabel": "확인 창 / 패스키",
+      "sources": [
+        {
+          "path": "apps/mcp/src/client-approval.ts",
+          "line": 1,
+          "end_line": 5,
+          "label": "클라이언트 확인 창 · 패스키"
+        },
+        {
+          "path": "docs/tool-contract.md",
+          "line": 46,
+          "end_line": 51,
+          "label": "같은 호출 안에서 확인 창"
+        }
+      ]
+    },
+    {
+      "id": "deny",
+      "lane": "stop",
+      "col": 3,
+      "type": "security",
+      "icon": "stop",
+      "label": "거절",
+      "sublabel": "여기서 멈춤",
+      "sources": [
+        {
+          "path": "apps/mcp/src/mcp-stdio.ts",
+          "line": 435,
+          "end_line": 436,
+          "label": "decline → POLICY_DENIED"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "call-floor",
+      "from": "call",
+      "to": "floor",
+      "variant": "emphasis"
+    },
+    {
+      "id": "floor-groups",
+      "from": "floor",
+      "to": "groups",
+      "label": "아니오",
+      "variant": "emphasis"
+    },
+    {
+      "id": "floor-deny",
+      "from": "floor",
+      "to": "deny",
+      "label": "예",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "groups-ceiling",
+      "from": "groups",
+      "to": "ceiling",
+      "label": "예",
+      "variant": "emphasis"
+    },
+    {
+      "id": "groups-deny",
+      "from": "groups",
+      "to": "deny",
+      "label": "아니오",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "ceiling-grants",
+      "from": "ceiling",
+      "to": "grants",
+      "label": "범위 안",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ceiling-deny",
+      "from": "ceiling",
+      "to": "deny",
+      "label": "초과",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "grants-run",
+      "from": "grants",
+      "to": "run",
+      "label": "있음",
+      "variant": "emphasis"
+    },
+    {
+      "id": "grants-ask",
+      "from": "grants",
+      "to": "ask",
+      "label": "없음",
+      "role": "branch"
+    },
+    {
+      "id": "ask-run",
+      "from": "ask",
+      "to": "run",
+      "label": "승인",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ask-deny",
+      "from": "ask",
+      "to": "deny",
+      "label": "거절",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "하나라도 거절하면 멈춤",
+      "items": [
+        "운영자 상한·속도 제한·pause는 사람 승인으로도 넘지 못함",
+        "레이어 3(기능 플래그)은 데몬 혼자 하는 백그라운드 작업이라 이 순서에 없음"
+      ]
+    }
+  ]
+}
