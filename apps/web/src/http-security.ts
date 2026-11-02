@@ -23,7 +23,16 @@ export function localRequestProblem(req: { method?: string; headers: IncomingHtt
 // Loopback keeps the network out, but not other OS users on the same machine: a local client sends
 // no browser headers, so the checks above let it through and this server would act as the person.
 // Each launch makes a secret that only the person's terminal shows. Opening the printed launch link
-// stores it in an HttpOnly, SameSite=Strict cookie; every other request without it is refused.
+// stores a separate page secret in an HttpOnly, SameSite=Strict cookie and hands the page's script an
+// API token in the URL fragment; every other request without them is refused.
+//
+// The cookie alone is not enough for the API: cookies ignore ports, so the browser also sends it to
+// any other server on 127.0.0.1 (an image, a link). Every /api request must carry the token in a
+// custom header, which only this page's script holds and which an image, a link or another origin
+// cannot attach (a cross-origin request with it needs a CORS preflight, which this server never grants).
+
+/** Header that carries the page's API token on every /api request (lowercase, as Node reports it). */
+export const API_TOKEN_HEADER = 'x-kakao-web-token';
 
 /** A fresh per-launch secret (256 bits, base64url). */
 export function createLaunchSecret(): string {
@@ -35,7 +44,7 @@ export function sessionCookieName(port: number): string {
   return `kakao_mcp_web_${port}`;
 }
 
-/** Set-Cookie value for the launch secret. Browser-only, never sent cross-site. */
+/** Set-Cookie value for the page secret. Browser-only, never sent cross-site (but sent to other local ports). */
 export function sessionCookie(port: number, secret: string): string {
   return `${sessionCookieName(port)}=${secret}; Path=/; HttpOnly; SameSite=Strict`;
 }
@@ -56,3 +65,31 @@ export function hasSession(headers: IncomingHttpHeaders, port: number, secret: s
   }
   return false;
 }
+
+/** True when the request carries this launch's API token header. */
+export function hasApiToken(headers: IncomingHttpHeaders, token: string): boolean {
+  return matchesSecret(headers[API_TOKEN_HEADER], token);
+}
+
+/** Where a valid launch link sends the browser: the page, with the API token in the fragment (never sent to a server). */
+export function launchLocation(token: string): string {
+  return `/#t=${token}`;
+}
+
+// The page loads only its own scripts, styles and data; remote images are https only (profile
+// pictures), and this page may not be framed, change its base URL or embed plugins.
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' blob: data: https:",
+  "connect-src 'self'", "font-src 'self'", "media-src 'self' blob:", "object-src 'none'", "base-uri 'none'",
+  "frame-ancestors 'none'", "form-action 'none'"
+].join('; ');
+
+/** Headers sent with every response of the GUI server. */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin'
+};
