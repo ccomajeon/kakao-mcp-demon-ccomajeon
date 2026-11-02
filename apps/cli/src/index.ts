@@ -11,6 +11,7 @@ import { McpClient, McpToolError } from './mcp-client.ts';
 import { readRoomSmokeAccess } from './smoke-read-scope.ts';
 import { runChatShell } from './chat-shell.ts';
 import { runTerminalMessenger } from './terminal-messenger.ts';
+import { terminalText as safe, terminalJson } from './terminal-text.ts';
 
 // ----------------------------------------------------------------------------
 // CLI and terminal messenger share the daemon's MCP policies and connection.
@@ -75,7 +76,7 @@ async function getBackend(): Promise<KakaoBackend> {
   try {
     await mcp.connect();
   } catch (e) {
-    console.error(`\n${c.red}${c.bold}❌ 카카오톡 MCP 데몬(${MCP_HOST}:${MCP_PORT})에 연결할 수 없습니다.${c.reset} ${c.dim}${(e as Error).message}${c.reset}`);
+    console.error(`\n${c.red}${c.bold}❌ 카카오톡 MCP 데몬(${MCP_HOST}:${MCP_PORT})에 연결할 수 없습니다.${c.reset} ${c.dim}${safe((e as Error).message)}${c.reset}`);
     console.error(`${c.gray}데몬을 실행하거나 터널을 여세요:${c.reset}`);
     console.error(`  • 로컬 데몬:  ${c.cyan}KAKAO_MCP_LISTEN=127.0.0.1:8787 npm run start --workspace=@kakao-mcp/mcp${c.reset}`);
     console.error(`  • 원격 터널:  ${c.cyan}ssh -N -L 8787:127.0.0.1:8787 <서버>${c.reset}\n`);
@@ -136,9 +137,10 @@ function formatTime(sec?: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+/** Received text, shortened for a table cell; escape and control characters never reach the terminal. */
 function truncate(str: string, len: number): string {
   if (!str) return '';
-  const clean = str.replace(/\n/g, ' ');
+  const clean = safe(str);
   return clean.length > len ? clean.slice(0, len - 1) + '…' : clean;
 }
 
@@ -194,12 +196,12 @@ async function cmdList() {
 function reportWriteError(e: any, requestId: string): void {
   if (e.code === 'APPROVAL_REQUIRED') {
     const link = approvalLink(e);
-    console.log(`\r${c.yellow}⏳ [승인 필요]${c.reset} ${link ? `이 링크에서 승인하세요: ${c.cyan}${link}${c.reset}` : e.message}`);
-    console.log(`${c.gray}승인한 뒤 같은 명령에 --request-id ${requestId} 를 붙여 다시 실행하세요.${c.reset}`);
+    console.log(`\r${c.yellow}⏳ [승인 필요]${c.reset} ${link ? `이 링크에서 승인하세요: ${c.cyan}${safe(link)}${c.reset}` : safe(e.message)}`);
+    console.log(`${c.gray}승인한 뒤 같은 명령에 --request-id ${safe(requestId)} 를 붙여 다시 실행하세요.${c.reset}`);
     return;
   }
   const unknown = e.code === 'SEND_OUTCOME_UNKNOWN' || e.code === 'MUTATION_OUTCOME_UNKNOWN';
-  console.log(`\r${c.red}❌ [${unknown ? '결과 불확실 — 휴대폰 확인 필요, 다시 보내지 마세요' : '실패'}]${c.reset} ${e.message}`);
+  console.log(`\r${c.red}❌ [${unknown ? '결과 불확실 — 휴대폰 확인 필요, 다시 보내지 마세요' : '실패'}]${c.reset} ${safe(e.message)}`);
 }
 
 async function cmdSend(targetArg: string, messageArg: string, requestId: string = randomUUID()) {
@@ -217,17 +219,17 @@ async function cmdSend(targetArg: string, messageArg: string, requestId: string 
 
   const chat = resolveRoom(state.chats, targetArg);
   if (!chat) {
-    console.error(`\n${c.red}❌ 대화방이나 친구를 찾을 수 없습니다: "${targetArg}"${c.reset}`);
+    console.error(`\n${c.red}❌ 대화방이나 친구를 찾을 수 없습니다: "${safe(targetArg)}"${c.reset}`);
     console.error(`${c.gray}'kakao friends' 또는 'kakao ls' 명령어로 대화 상대나 방을 확인해주세요.${c.reset}\n`);
     process.exit(1);
   }
 
-  const roomName = chat.title || chat.id;
+  const roomName = safe(chat.title || chat.id);
   process.stdout.write(`${c.dim}[전송 중...]${c.reset} ${c.bold}${roomName}${c.reset} 에게 발송 중... `);
 
   try {
     const res = await backend.sendMessage(chat.id, messageArg, requestId);
-    console.log(`\r${c.green}${c.bold}✅ [전송 완료]${c.reset} ${c.bold}${roomName}${c.reset}: "${messageArg}" ${c.gray}(logId: ${res.logId})${c.reset}`);
+    console.log(`\r${c.green}${c.bold}✅ [전송 완료]${c.reset} ${c.bold}${roomName}${c.reset}: "${safe(messageArg)}" ${c.gray}(logId: ${safe(res.logId)})${c.reset}`);
   } catch (e: any) {
     process.exitCode = 1;
     reportWriteError(e, requestId);
@@ -244,14 +246,14 @@ async function cmdSendMedia(targetArg: string, filePath: string, type: number = 
   const state = await backend.getState();
   const chat = resolveRoom(state.chats, targetArg);
   if (!chat) {
-    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${targetArg}"${c.reset}\n`);
+    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${safe(targetArg)}"${c.reset}\n`);
     process.exit(1);
   }
 
-  process.stdout.write(`${c.dim}[전송 중]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} 으로 파일 전송 중 (${filePath})... `);
+  process.stdout.write(`${c.dim}[전송 중]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} 으로 파일 전송 중 (${safe(filePath)})... `);
   try {
     const res = await backend.sendMedia(chat.id, filePath, type, requestId);
-    console.log(`\r${c.green}✅ [전송 완료]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} (logId: ${c.cyan}${res.logId}${c.reset})\n`);
+    console.log(`\r${c.green}✅ [전송 완료]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} (logId: ${c.cyan}${safe(res.logId)}${c.reset})\n`);
   } catch (e: any) {
     process.exitCode = 1;
     reportWriteError(e, requestId);
@@ -268,17 +270,17 @@ async function cmdDownloadMedia(targetArg: string, token: string, outputPath: st
   const state = await backend.getState();
   const chat = resolveRoom(state.chats, targetArg);
   if (!chat) {
-    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${targetArg}"${c.reset}\n`);
+    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${safe(targetArg)}"${c.reset}\n`);
     process.exit(1);
   }
 
-  process.stdout.write(`${c.dim}[다운로드 중]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} 에서 미디어 다운로드 중... `);
+  process.stdout.write(`${c.dim}[다운로드 중]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} 에서 미디어 다운로드 중... `);
   try {
     const res = await backend.downloadMedia(chat.id, token, outputPath, 2, isMini, messageId, readGrantId);
-    console.log(`\r${c.green}✅ [다운로드 완료]${c.reset} ${c.cyan}${outputPath}${c.reset} (${res.size || 'N/A'} bytes)\n`);
+    console.log(`\r${c.green}✅ [다운로드 완료]${c.reset} ${c.cyan}${safe(outputPath)}${c.reset} (${safe(res.size || 'N/A')} bytes)\n`);
   } catch (e: any) {
     process.exitCode = 1;
-    console.log(`\r${c.red}❌ [다운로드 실패]${c.reset} ${e.message}\n`);
+    console.log(`\r${c.red}❌ [다운로드 실패]${c.reset} ${safe(e.message)}\n`);
   }
 }
 
@@ -292,14 +294,14 @@ async function cmdRead(targetArg: string, requestId: string = randomUUID()) {
   const state = await backend.getState();
   const chat = resolveRoom(state.chats, targetArg);
   if (!chat) {
-    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${targetArg}"${c.reset}\n`);
+    console.error(`\n${c.red}❌ 대화방을 찾을 수 없습니다: "${safe(targetArg)}"${c.reset}\n`);
     process.exit(1);
   }
 
   const watermark = chat.maxLogId || '0';
   try {
     await backend.markRead(chat.id, String(watermark), requestId);
-    console.log(`\n${c.green}✅ [읽음 처리]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} 의 메시지를 모두 읽음 처리했습니다.\n`);
+    console.log(`\n${c.green}✅ [읽음 처리]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} 의 메시지를 모두 읽음 처리했습니다.\n`);
   } catch (e: any) {
     process.exitCode = 1;
     reportWriteError(e, requestId);
@@ -312,8 +314,8 @@ async function cmdStatus() {
 
   console.log(`\n${c.bold}카카오톡 세션 연결 상태:${c.reset}`);
   console.log(`  • 상태:         ${state.connected ? c.green + '● 정상 연결됨 (Online)' : c.red + '○ 연결 끊김 (Offline)'}${c.reset}`);
-  console.log(`  • 사용자 ID:    ${c.cyan}${state.userId || '확인 불가'}${c.reset}`);
-  console.log(`  • 캐리지 서버:  ${state.endpoint ? `${state.endpoint.host}:${state.endpoint.port}` : '미할당'}`);
+  console.log(`  • 사용자 ID:    ${c.cyan}${safe(state.userId || '확인 불가')}${c.reset}`);
+  console.log(`  • 캐리지 서버:  ${state.endpoint ? safe(`${state.endpoint.host}:${state.endpoint.port}`) : '미할당'}`);
   console.log(`  • 대화방 수:    ${state.chats.length} 개 로드됨\n`);
 }
 
@@ -323,19 +325,19 @@ async function cmdFriends(query?: string) {
   try {
     const res = await backend.listFriends(query, 50);
     const friends = res.friends || [];
-    console.log(`\r${c.green}✅ [친구 목록]${c.reset} ${query ? `"${c.bold}${query}${c.reset}" 검색 결과: ` : ''}총 ${friends.length}명\n`);
+    console.log(`\r${c.green}✅ [친구 목록]${c.reset} ${query ? `"${c.bold}${safe(query)}${c.reset}" 검색 결과: ` : ''}총 ${friends.length}명\n`);
     console.log(`${c.gray}${'─'.repeat(75)}${c.reset}`);
     for (let i = 0; i < friends.length; i++) {
       const f = friends[i];
-      const name = f.friendNickName ? `${c.bold}${f.friendNickName}${c.reset} (${f.nickName})` : `${c.bold}${f.nickName}${c.reset}`;
+      const name = f.friendNickName ? `${c.bold}${safe(f.friendNickName)}${c.reset} (${safe(f.nickName)})` : `${c.bold}${safe(f.nickName)}${c.reset}`;
       const status = f.statusMessage ? `${c.dim}"${truncate(f.statusMessage, 30)}"${c.reset}` : '';
-      const uid = `${c.cyan}${f.userId}${c.reset}`;
+      const uid = `${c.cyan}${safe(f.userId)}${c.reset}`;
       console.log(` ${c.yellow}${(i + 1).toString().padStart(2, ' ')}.${c.reset}  ${name.padEnd(35, ' ')} ${uid.padEnd(22, ' ')} ${status}`);
     }
     console.log(`${c.gray}${'─'.repeat(75)}${c.reset}`);
     console.log(`${c.dim}💡 1:1 대화방 열기: kakao history "<친구이름>" 또는 kakao send "<친구이름>" "<메시지>"${c.reset}\n`);
   } catch (e: any) {
-    console.log(`\r${c.red}❌ [친구 조회 실패]${c.reset} ${e.message}\n`);
+    console.log(`\r${c.red}❌ [친구 조회 실패]${c.reset} ${safe(e.message)}\n`);
   }
 }
 
@@ -348,33 +350,33 @@ async function cmdHistory(targetArg: string, limitArg?: string, readGrantId?: st
   const state = await backend.getState();
   const chat = resolveRoom(state.chats, targetArg);
   if (!chat) {
-    console.error(`\n${c.red}❌ 대화방이나 친구를 찾을 수 없습니다: "${targetArg}"${c.reset}\n`);
+    console.error(`\n${c.red}❌ 대화방이나 친구를 찾을 수 없습니다: "${safe(targetArg)}"${c.reset}\n`);
     process.exit(1);
   }
 
   const limit = Number(limitArg) || 20;
-  process.stdout.write(`${c.dim}[조회 중...]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} 최근 ${limit}개 메시지 불러오는 중... `);
+  process.stdout.write(`${c.dim}[조회 중...]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} 최근 ${limit}개 메시지 불러오는 중... `);
   try {
     const res = await backend.getHistory(chat.id, limit, readGrantId);
     const msgs = res.messages || [];
-    console.log(`\r${c.green}✅ [조회 완료]${c.reset} ${c.bold}${chat.title || chat.id}${c.reset} (${msgs.length}개 메시지)\n`);
+    console.log(`\r${c.green}✅ [조회 완료]${c.reset} ${c.bold}${safe(chat.title || chat.id)}${c.reset} (${msgs.length}개 메시지)\n`);
     console.log(`${c.gray}${'─'.repeat(70)}${c.reset}`);
     for (const m of msgs) {
       const timeStr = formatTime(m.sendAt);
       const isMe = String(m.authorId) === String(state.userId);
-      const sender = isMe ? `${c.yellow}[나]${c.reset}` : `${c.cyan}[${m.authorName || (res.members && res.members[m.authorId]?.name) || m.authorId || '상대방'}]${c.reset}`;
-      console.log(` ${c.dim}${timeStr}${c.reset}  ${sender}  ${m.text || c.dim + '(미디어/첨부)' + c.reset}`);
+      const sender = isMe ? `${c.yellow}[나]${c.reset}` : `${c.cyan}[${safe(m.authorName || (res.members && res.members[m.authorId]?.name) || m.authorId || '상대방')}]${c.reset}`;
+      console.log(` ${c.dim}${timeStr}${c.reset}  ${sender}  ${m.text ? safe(m.text) : c.dim + '(미디어/첨부)' + c.reset}`);
     }
     console.log(`${c.gray}${'─'.repeat(70)}${c.reset}`);
     const s = res.sync;
     if (s) {
       const why = s.error ? ` error=${s.error}` : s.reason ? ` (${s.reason})` : '';
-      console.log(`${c.dim}SYNCMSG ${s.mode}: status=${s.status ?? '-'} pages=${s.pages} fetched=${s.fetched} new=${s.inserted} max=${s.max}${why}${c.reset}`);
+      console.log(`${c.dim}${safe(`SYNCMSG ${s.mode}: status=${s.status ?? '-'} pages=${s.pages} fetched=${s.fetched} new=${s.inserted} max=${s.max}${why}`)}${c.reset}`);
     }
     console.log('');
   } catch (e: any) {
     process.exitCode = 1;
-    console.log(`\r${c.red}❌ [조회 실패]${c.reset} ${e.message}\n`);
+    console.log(`\r${c.red}❌ [조회 실패]${c.reset} ${safe(e.message)}\n`);
   }
 }
 
@@ -391,20 +393,20 @@ async function cmdSearch(query: string, targetArg?: string, readGrantId?: string
     if (chat) chatId = chat.id;
   }
 
-  process.stdout.write(`${c.dim}[검색 중...]${c.reset} "${query}" 메시지 검색 중... `);
+  process.stdout.write(`${c.dim}[검색 중...]${c.reset} "${safe(query)}" 메시지 검색 중... `);
   try {
     const res = await backend.searchMessages(query, chatId, 20, readGrantId);
     const msgs = res.messages || [];
-    console.log(`\r${c.green}✅ [검색 완료]${c.reset} "${c.bold}${query}${c.reset}" 결과: ${msgs.length}건\n`);
+    console.log(`\r${c.green}✅ [검색 완료]${c.reset} "${c.bold}${safe(query)}${c.reset}" 결과: ${msgs.length}건\n`);
     for (const m of msgs) {
       const chatTitle = state.chats.find(c => c.id === m.chatId)?.title || m.chatId;
       const timeStr = formatTime(m.sendAt);
-      console.log(` ${c.magenta}[${truncate(chatTitle, 15)}]${c.reset} ${c.dim}${timeStr}${c.reset} ${c.bold}${m.authorName || '상대방'}:${c.reset} ${m.text}`);
+      console.log(` ${c.magenta}[${truncate(String(chatTitle ?? ''), 15)}]${c.reset} ${c.dim}${timeStr}${c.reset} ${c.bold}${safe(m.authorName || '상대방')}:${c.reset} ${safe(m.text)}`);
     }
     console.log('');
   } catch (e: any) {
     process.exitCode = 1;
-    console.log(`\r${c.red}❌ [검색 실패]${c.reset} ${e.message}\n`);
+    console.log(`\r${c.red}❌ [검색 실패]${c.reset} ${safe(e.message)}\n`);
   }
 }
 
@@ -424,7 +426,7 @@ async function cmdTest(groupOnly = false, chatId?: string) {
       console.log(`${c.green}✔ PASS${c.reset} ${c.dim}${await fn()}${c.reset}`);
     } catch (e: any) {
       failed++;
-      console.log(`${c.red}✖ FAIL${c.reset} ${e instanceof SmokeAssertionError ? e.message : toKakaoError(e).code}`);
+      console.log(`${c.red}✖ FAIL${c.reset} ${e instanceof SmokeAssertionError ? e.message : safe(toKakaoError(e).code)}`);
     }
   };
   const assert = (cond: unknown, msg: string) => {
@@ -617,7 +619,7 @@ async function main() {
       const client = new McpClient({ host: MCP_HOST, port: MCP_PORT });
       try {
         await client.connect();
-        console.log(JSON.stringify(await runAgentFileCommand(client, args[0]), null, 2));
+        console.log(terminalJson(await runAgentFileCommand(client, args[0])));
       } catch (e: any) {
         process.exitCode = 1;
         reportWriteError(e, readAgentRequest(args[0]).requestId);
@@ -669,7 +671,7 @@ async function main() {
         // Default to ls if no command given
         await cmdList();
       } else {
-        console.error(`${c.red}알 수 없는 명령어: ${cmd}${c.reset}`);
+        console.error(`${c.red}알 수 없는 명령어: ${safe(cmd)}${c.reset}`);
         cmdHelp();
         process.exit(1);
       }
@@ -681,6 +683,6 @@ main()
     process.exit(process.exitCode ?? 0);
   })
   .catch((err) => {
-    console.error(`${c.red}오류 발생: ${err.message}${c.reset}`);
+    console.error(`${c.red}오류 발생: ${safe(err?.message)}${c.reset}`);
     process.exit(1);
   });

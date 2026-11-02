@@ -162,7 +162,8 @@ export function registerCoreReadTools(server: McpStdioServer, deps: {
       const extra = Object.keys(args).filter(k => !['chatId', 'mode', 'readGrantId', 'requestId', ...allowed[mode]].includes(k));
       if (extra.length) throw new KakaoError('INVALID_ARGUMENT', `${extra.join(', ')} does not apply to mode "${mode}"`);
       const ranged = mode === 'history' && (args.from !== undefined || args.to !== undefined || args.cursor !== undefined);
-      const count = mode === 'search' ? num(args.limit, 20) : mode === 'history' ? num(args.limit, ranged ? 100 : 50) : 1;
+      // recent/wait return up to the room limit, so a one-time approval asks for that size; core caps the result at the grant.
+      const count = mode === 'search' ? num(args.limit, 20) : mode === 'history' ? num(args.limit, ranged ? 100 : 50) : kakao.getRoomAccess(chatId).rule.maxMessages ?? 50;
       const grant = typeof args.readGrantId === 'string' ? readGrant(args, 'read_messages') : await askToRead(chatId, count, args, call);
       if (mode === 'search') {
         if (typeof args.query !== 'string' || !args.query) throw new KakaoError('INVALID_ARGUMENT', '"query" is required to search');
@@ -173,7 +174,7 @@ export function registerCoreReadTools(server: McpStdioServer, deps: {
       if (mode === 'recent') {
         const since = num(args.sinceSeq, 0);
         const messages = await kakao.recentMessages(since, chatId, grant);
-        return markUntrusted({ cursor: messages.at(-1)?.seq ?? since, messages, hasMore: messages.length >= (kakao.getRoomAccess(chatId).rule.maxMessages ?? 50) });
+        return markUntrusted({ cursor: messages.at(-1)?.seq ?? since, messages, hasMore: messages.length >= kakao.liveReadLimit(chatId, grant) });
       }
       if (mode === 'wait') {
         const since = num(args.sinceSeq, kakao.cursor);
