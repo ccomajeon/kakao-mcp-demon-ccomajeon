@@ -28,6 +28,27 @@
 
 기존 버전 대신 `0.2.0-rebuild.2`를 설치한다. 새 패키지를 설치하는 것만으로 이미 복사되어 실행 중인 관리형 데몬이 바뀌지는 않는다. 패키지 방식의 관리형 서버는 새 `.tgz`를 시스템 전역에 설치한 후 운영자가 `kakao-mcp-ccomajeon setup --update`를 실행한다. 업데이트의 재시작·계정 연결은 이번 검토에서 실행하지 않았다.
 
+## 2026-11-02 추가 검사와 수정
+
+레포 전체(MCP 서버·승인, core·protocol, 웹 화면·CLI)를 다시 검사했다. 범위와 한계는 위 검사와 같다(소스·격리 재현 테스트, 실계정·운영 서버 미포함). 심각도는 개인 서버에서 계정 하나를 쓰는 배포 기준의 평가다.
+
+| ID / 평가 | 확인된 영향과 전제 | 수정 및 증거 |
+|---|---|---|
+| SEC-05 / High (같은 서버에 다른 서비스·사용자가 있을 때) | Linux 접속 사용자 확인이 `/proc/net/tcp`의 연결 상태와 상대 주소를 확인하지 않아, 같은 서버의 비특권 사용자가 root 연결로 판정될 수 있었음 | `apps/mcp/src/peer-user.ts`: ESTABLISHED·inode·양쪽 주소와 포트가 모두 맞는 행 하나만 인정, 여러 행이 맞으면 거절. `peer-user.test.ts` 회귀 4개. 비특권 사용자 재현이 수정 전 허용, 수정 후 거절 |
+| SEC-06 / Medium | 전송·사진 승인 창과 패스키 페이지가 대상 방을 숫자 ID로만 보여, 조종된 AI가 다른 방으로 보내도 사람이 알아차리기 어려웠음 | `packages/core/src/agent-send.ts`, `apps/mcp/src/client-approval.ts`, `approval-server.ts`, `approval-page.ts`: 방 이름·종류·인원수를 승인 내용과 digest에 포함하고 신뢰할 수 없는 값으로 표시. 방 정보가 바뀌면 `OPERATION_STALE` |
+| SEC-07 / Low | manual 방 메시지를 수정·삭제·이모티콘으로 요청하면 승인 전 오류에 저장된 본문이 담겨 에이전트에게 돌아갔음 | `redactApprovalForAgent()`(`agent-send.ts`)를 `mcp-stdio.ts`에서 적용. 에이전트에는 본문을 가린 `reviewText`만 전달, 확인 창·패스키 페이지는 원문 유지. 회귀 테스트가 수정 없이 실패 |
+| SEC-08 / Medium | 웹 화면 세션 쿠키는 포트를 구분하지 않아 같은 PC의 다른 loopback 포트로 전송될 수 있었고, API가 쿠키만으로 인증했음 | `apps/web/src/http-security.ts`, `index.ts`, `public/app.js`: API마다 탭 전용 토큰 헤더(`X-Kakao-Web-Token`)를 추가로 요구, SSE를 fetch 스트림으로 변경, URL 사진 토큰 직접 표시와 미리보기 외부 이미지 로딩 제거. `server-routes.test.ts`에서 쿠키만으로는 401 확인 |
+| SEC-09 / Medium | 링크 미리보기 이미지 값이 style 속성 안에 들어가 화면 전체를 덮는 CSS를 넣을 수 있었음 | `app.js`: `esc()`가 작은따옴표도 이스케이프, style 속성에 URL을 넣지 않고 DOM API로 설정, 미리보기 이미지는 표시하지 않음. `render-security.test.ts` 회귀 |
+| SEC-10 / Low | 웹 화면에 CSP 등 보안 헤더가 없었음 | 모든 응답에 CSP(`script-src 'self'`, `frame-ancestors 'none'` 등), `nosniff`, `Referrer-Policy`, `X-Frame-Options` 추가. 인라인 onclick을 위임 리스너로 교체 |
+| SEC-11 / Medium | CLI 일반 명령(`ls`, `history`, `search`, `friends` 등)이 받은 텍스트를 그대로 출력해 터미널 제어문자(클립보드 쓰기 등)가 실행될 수 있었음 | `apps/cli/src/index.ts`: 외부 문자열을 모두 `terminalText()`로 정리, JSON 출력은 `terminalJson()`. `cli-terminal-safety.test.ts`가 수정 전 실패 |
+| SEC-12 / Medium | 일정·할 일 추출 정규식이 긴 공백에서 다항 시간 역추적을 해, 메시지 하나로 데몬 전체가 수십 초 이상 멈출 수 있었음 | `packages/core/src/curation-tools.ts`: 줄 500자 제한, 공백 압축, 반복 구간 상한. 공백 150개 입력이 약 1초에서 1ms 미만으로. `local-vault.test.ts` 시간 회귀 |
+| SEC-13 / Low | 1회 읽기 허가의 개수가 `read_messages` recent·wait에서 적용되지 않았음 | `kakao-session.ts` `liveReadLimit()`: 방 한도와 허가 개수 중 작은 값으로 제한. `agent-read-bounds.test.ts` |
+| SEC-14 / Low | 에이전트용 첨부 다운로드에 크기 상한이 없어 큰 파일 하나로 메모리가 크게 늘 수 있었음 | `kakao-session.ts` `downloadMedia`: 16 MiB 상한 전달, 저장된 크기가 넘으면 전송 전 거절 |
+
+남은 사항: 서버가 상한보다 큰 크기를 알리고 저장된 크기가 없으면 다운로드는 막히지만 오류 코드는 `INTERNAL`이다. 카카오 서버가 터미널 제어문자를 실제로 전달하는지는 실계정에서 확인하지 않았다. 웹 화면은 새 탭마다 실행 링크를 다시 열어야 하고, 링크 미리보기는 이미지 없이 표시된다.
+
+검증: 전체 `npm test` 734개 중 729 통과·실패 0·건너뜀 5, `npm run typecheck`, `npm run check:package`, `git diff --check` 통과. `npm audit` 알려진 취약점 0건.
+
 ## 의존성과 비밀정보 검사
 
 - 앱의 `npm audit --json`: 알려진 취약점 0건. 개발·선택 의존성을 포함한 lockfile 검사다. 악성 패키지나 모든 로직 오류를 증명하는 검사가 아니다.
