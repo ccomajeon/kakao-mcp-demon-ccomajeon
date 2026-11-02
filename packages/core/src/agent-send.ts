@@ -22,6 +22,11 @@ export interface AgentOperationAdapter<T extends { chatId: string }> {
   connected(): boolean;
   /** Bounded locally known metadata only, not server history or message contents. */
   context(chatId: string): string;
+  /**
+   * What the person sees about the target room when approving: locally known title, type and member count.
+   * Bound into the reviewed envelope and its context digest, so a different room or a renamed one cannot reuse the approval.
+   */
+  room?(chatId: string): RoomReview;
   send(message: T, attempt?: SendAttempt): Promise<{ status: number; logId?: string }>;
   /** The room's newest known log ID, recorded before a send so its history can be searched from there. */
   roomCursor?(chatId: string): string | undefined;
@@ -29,6 +34,16 @@ export interface AgentOperationAdapter<T extends { chatId: string }> {
   findSent?(chatId: string, msgId: number, sinceLogId: string): Promise<{ found: true; logId: string } | { found: false; complete: boolean }>;
   /** Wait up to `timeoutMs` for the account session to (re)connect. */
   waitConnected?(timeoutMs: number): Promise<boolean>;
+}
+/** Locally known room metadata shown for review. Titles are set by room members: untrusted text, never instructions. */
+export interface RoomReview { title: string | null; type: string | null; memberCount: number | null }
+const TITLE_CHARS = 200, TYPE_CHARS = 32;
+/** Closed, bounded room review; an overlong title is cut the same way at prepare and commit. */
+export function parseRoomReview(input: RoomReview): RoomReview {
+  const text = (x: unknown, max: number) => typeof x === 'string' && x.length ? [...x].slice(0, max).join('') : null;
+  const count = input?.memberCount;
+  return { title: text(input?.title, TITLE_CHARS), type: text(input?.type, TYPE_CHARS),
+    memberCount: Number.isSafeInteger(count) && (count as number) >= 0 ? count as number : null };
 }
 /** One send attempt: the client message ID the server echoes in the room's chat log. */
 export interface SendAttempt { msgId: number }
@@ -87,8 +102,32 @@ export function requireApproval(o: {
   }
   if (o.row.expires_at <= o.now) throw expire();
   if (o.permission?.()) return;
-  // The exact text lets a transport ask the human directly (MCP elicitation); the agent already has it from prepare.
+  // The exact text lets a transport ask the human directly (MCP elicitation). Transports return it to the agent only
+  // through redactApprovalForAgent: stored message content in it is for the person, not the agent.
   throw new KakaoError('APPROVAL_REQUIRED', o.missing, { details: { approval: { requestId: o.row.request_id, signingText: o.envelope, expiresAt: o.row.expires_at } } });
+}
+/** Stored message fields a review envelope may carry: shown to the person, never to the agent before approval. */
+const STORED_CONTENT = ['text', 'attachment'] as const;
+export const REDACTED_FOR_AGENT = '[redacted until the person approves]';
+/**
+ * APPROVAL_REQUIRED details as returned to the agent. A change to a stored message carries that message's text and
+ * attachment for the person's review, read with the approval-covered confirmRead (possibly in a room the agent may
+ * not read). The agent gets a copy with those fields redacted (`reviewText`) and no `signingText`; the approval
+ * digest, the client dialog and the passkey page keep the exact envelope.
+ */
+export function redactApprovalForAgent(approval: unknown): unknown {
+  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) return approval;
+  const { signingText, ...rest } = approval as Record<string, unknown>;
+  if (typeof signingText !== 'string') return approval;
+  let envelope: Record<string, any>;
+  try { envelope = JSON.parse(signingText) as Record<string, any>; } catch { return rest; }
+  const target = envelope?.context?.target;
+  if (!target || typeof target !== 'object') return approval;
+  const fields = STORED_CONTENT.filter(k => typeof target[k] === 'string');
+  if (!fields.length) return approval;
+  const redacted = { ...target, ...Object.fromEntries(fields.map(k => [k, REDACTED_FOR_AGENT])) };
+  return { ...rest, reviewText: canonicalAgentJson({ ...envelope, context: { ...envelope.context, target: redacted } }),
+    redacted: fields.map(k => `context.target.${k}`) };
 }
 export interface AgentOperationDefinition<T extends { chatId: string }> {
   domain: string; action: string; parse(input: T): T; textLength(input: T): number; requireSignature?: boolean;
@@ -277,23 +316,29 @@ export class AgentOperationService<T extends { chatId: string }> {
     // Only the daemon's own notifier may skip approval for the notice destination; agents need a room permission there too.
     return decision.category === 'notification' && this.deps.notifications ? 'notification' : 'message-as-you';
   }
-  private envelope(row: Row, message: T): string {
+  /** The target room as reviewed; undefined only for an adapter without room metadata. */
+  private room(chatId: string): RoomReview | undefined {
+    const room = this.deps.adapter.room?.(chatId);
+    return room === undefined ? undefined : parseRoomReview(room);
+  }
+  private envelope(row: Row, message: T, room: RoomReview | undefined): string {
     return canonicalAgentJson({ domain: this.deps.definition.domain, action: this.deps.definition.action, principal: this.deps.principal,
-      accountId: this.deps.adapter.accountId(), requestId: row.request_id, message,
+      accountId: this.deps.adapter.accountId(), requestId: row.request_id, message, ...(room ? { context: { room } } : {}),
       contextDigest: row.context_digest, policyDigest: row.policy_digest,
       createdAt: row.created_at, expiresAt: row.expires_at, commitWindowMs: COMMIT_WINDOW_MS });
   }
-  private definition(id: string, message: T): WriteDefinition<void, { status: number; logId?: string }, AgentSendResult> {
+  private definition(id: string, message: T): WriteDefinition<RoomReview | undefined, { status: number; logId?: string }, AgentSendResult> {
     const { journal, adapter, policy } = this.deps;
     return {
       action: this.deps.definition.action, payloadDigest: this.payloadDigest(message),
       roomDigest: journal.digest({ account: adapter.accountId(), room: message.chatId }), policyDigest: () => this.policyDigest(),
-      inspect: () => {},
-      context: () => adapter.context(message.chatId), category: () => {
+      inspect: () => this.room(message.chatId),
+      // The reviewed room is part of the context digest: a renamed or changed room makes the operation stale.
+      context: room => room ? { metadata: adapter.context(message.chatId), room } : adapter.context(message.chatId), category: () => {
         if (!adapter.connected()) throw new KakaoError('NOT_CONNECTED', 'Account is not connected');
         return this.category(message);
       },
-      envelope: row => this.envelope(row, message),
+      envelope: (row, room) => this.envelope(row, message, room),
       requiresApproval: row => this.deps.definition.requireSignature === true || row.category !== 'notification',
       permissionId: () => this.deps.recipients?.covers(this.deps.definition.action, message as Record<string, unknown>),
       consumePermission: () => this.deps.recipients?.consume(id, this.deps.definition.action, message as Record<string, unknown>) ?? false,
@@ -348,7 +393,7 @@ export class AgentOperationService<T extends { chatId: string }> {
   prepare(id: string, raw: T) {
     requestId(id); const message = this.deps.definition.parse(raw);
     const prepared = new WriteOperationEngine(this.deps).prepare(id, this.definition(id, message));
-    return { ...prepared, signingText: prepared.signingText ?? this.envelope(this.deps.journal.get(id)!, message) };
+    return { ...prepared, signingText: prepared.signingText ?? this.envelope(this.deps.journal.get(id)!, message, this.room(message.chatId)) };
   }
   async send(id: string, raw: T): Promise<AgentSendResult> {
     requestId(id); const message = this.deps.definition.parse(raw);

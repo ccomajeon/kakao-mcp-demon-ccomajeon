@@ -58,3 +58,20 @@ test('hostile content is wrapped as untrusted data and cannot clear the marker',
   assert.ok(String(wrapped.notice).startsWith('UNTRUSTED THIRD-PARTY CONTENT'));
   assert.equal(Object.keys(wrapped)[0], 'untrusted');
 });
+
+test('the approval names the reviewed room by title, kind, member count and chatId, and marks the title as untrusted', () => {
+  const group = approvalMessage(envelope({ context: { room: { title: '가족방', type: 'MultiChat', memberCount: 12 } } }))!.split('\n');
+  const at = group.indexOf('대상 가족방 (그룹 · 12명, chatId 123456789)');
+  assert.ok(at > 0, group.join('\n'));
+  assert.match(group[at + 1], /방 이름은 참여자가 정한 글자라 믿을 수 없습니다/);
+  const direct = approvalMessage(envelope({ context: { room: { title: null, type: 'DirectChat', memberCount: null } } }))!.split('\n');
+  assert.ok(direct.includes('대상 (방 이름 모름) (1:1, chatId 123456789)'));
+  assert.equal(direct.some(line => line.startsWith('(방 이름은')), false, 'no member-set text, no warning');
+  // A mutation names its destination room, not the stored source message's room.
+  const emoticon = approvalMessage(JSON.stringify({ action: 'send_emoticon', accountId: '111111111', requestId: 'fixture-request',
+    message: { chatId: '123456789', fromChatId: '555555555', fromLogId: '1' },
+    context: { kind: 'message', target: { chatId: '555555555' }, room: { maxLogId: '1', memberCount: 3, title: '오픈 방', type: 'OM' } } }))!;
+  assert.ok(emoticon.split('\n').includes('대상 오픈 방 (오픈채팅 그룹 · 3명, chatId 123456789)'));
+  // Without reviewed metadata the line keeps showing the exact ID.
+  assert.ok(approvalMessage(envelope({ context: undefined }))!.split('\n').includes('대상 123456789'));
+});

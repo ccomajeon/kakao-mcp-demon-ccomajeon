@@ -4,23 +4,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, type AgentMessage, type AgentSendAdapter } from './agent-send.ts';
+import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, type AgentMessage, type AgentSendAdapter, type RoomReview } from './agent-send.ts';
 import { LocoError } from '@kakao-mcp/protocol';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';
 import { SendPolicy } from './policy.ts';
 import { KakaoError } from './errors.ts';
 
-function fixture(t: { after(fn: () => void): void }, notification = false) {
+function fixture(t: { after(fn: () => void): void }, notification = false, withRoom = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-send-'));
   let now = 1000000, context = 'local-version-1', account = '123456789', connected = true, calls = 0;
   let effect: AgentSendAdapter['send'] = async () => ({ status: 0, logId: '9007199254740993' });
   let history: AgentSendAdapter['findSent'];
+  let room: RoomReview = { title: 'fixture 가족방', type: 'MultiChat', memberCount: 12 };
   const msgIds: Array<number | undefined> = [];
   const policy = () => new SendPolicy({ ceiling: ['123456789','987654321'], notifyChatId: notification ? '123456789' : undefined,
     pausedAtStart: false, auditLogPath: path.join(root, 'audit.jsonl') }, { now: () => now });
   const adapter: AgentSendAdapter = { accountId: () => account, connected: () => connected,
     context: () => context, send: async (m, attempt) => { calls++; msgIds.push(attempt?.msgId); return effect(m, attempt); },
-    roomCursor: () => '9007199254740000',
+    roomCursor: () => '9007199254740000', ...(withRoom ? { room: () => room } : {}),
     findSent: async (chatId, msgId, since) => history ? history(chatId, msgId, since) : { found: false, complete: false } };
   const journals: AgentSendJournal[] = [];
   const create = () => {
@@ -36,7 +37,8 @@ function fixture(t: { after(fn: () => void): void }, notification = false) {
     effect: (value: AgentSendAdapter['send']) => { effect = value; },
     history: (value: AgentSendAdapter['findSent']) => { history = value; },
     advance: (ms: number) => { now += ms; }, context: (value: string) => { context = value; },
-    account: (value: string) => { account = value; }, disconnect: () => { connected = false; } };
+    account: (value: string) => { account = value; }, disconnect: () => { connected = false; },
+    room: (value: RoomReview) => { room = value; } };
 }
 
 test('an approved immutable payload survives restart, preserves exact IDs and rejects changed fields', async t => {
@@ -86,6 +88,29 @@ test('approval cannot outlive expiration or a changed context or policy', async 
     if (mode === 'context') f.context('new-version');
     if (mode === 'pause') f.policy.setPaused(true);
     await assert.rejects(f.service.send(id, f.message), { code: mode === 'expiry' ? 'OPERATION_EXPIRED' : 'OPERATION_STALE' });
+    assert.equal(f.calls(), 0);
+  }
+});
+
+test('the reviewed room (title, type, member count) is part of the approved text and its digest', async t => {
+  const f = fixture(t, false, true), id = randomUUID(), prepared = f.service.prepare(id, f.message);
+  assert.deepEqual(JSON.parse(prepared.signingText!).context, { room: { title: 'fixture 가족방', type: 'MultiChat', memberCount: 12 } });
+  f.approve(prepared);
+  assert.equal((await f.service.send(id, f.message)).state, 'sent_unverified');
+  // Bounded and closed: unknown keys are dropped and an overlong title is cut the same way every time.
+  f.room({ title: 'x'.repeat(500), type: 'OM', memberCount: -1, extra: 'fixture' } as unknown as RoomReview);
+  const long = JSON.parse(f.service.prepare(randomUUID(), f.message).signingText!).context.room;
+  assert.deepEqual(long, { title: 'x'.repeat(200), type: 'OM', memberCount: null });
+  // Without room metadata the envelope keeps its earlier shape.
+  assert.equal(JSON.parse(fixture(t).service.prepare(randomUUID(), f.message).signingText!).context, undefined);
+});
+
+test('a room renamed or changed between review and commit makes the approval stale', async t => {
+  for (const change of [{ title: 'fixture 다른 방' }, { type: 'DirectChat' }, { memberCount: 13 }]) {
+    const f = fixture(t, false, true), id = randomUUID(), prepared = f.service.prepare(id, f.message); f.approve(prepared);
+    f.room({ title: 'fixture 가족방', type: 'MultiChat', memberCount: 12, ...change });
+    await assert.rejects(f.service.send(id, f.message), { code: 'OPERATION_STALE' });
+    await assert.rejects(f.service.send(id, f.message), { code: 'OPERATION_STALE' }, 'stale stays stale');
     assert.equal(f.calls(), 0);
   }
 });

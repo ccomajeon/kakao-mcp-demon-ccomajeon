@@ -6,7 +6,7 @@ import type { McpStdioServer } from '../mcp-stdio.ts';
 
 export function agentPublicationAdapter(kakao: KakaoSession, policy: SendPolicy): AgentPublicationAdapter {
   const metadata = agentMessageAdapter(kakao);
-  return { accountId: metadata.accountId, connected: metadata.connected, context: metadata.context,
+  return { accountId: metadata.accountId, connected: metadata.connected, context: metadata.context, room: metadata.room,
     send: async (action, { descriptor: m, buffers }) => {
       if (action === 'forward_message') return kakao.forwardMessage(m.chatId, { text: m.text!, type: m.type!, extra: m.extra });
       if (action === 'send_photo_bundle') return kakao.uploadMultiPhotos(m.chatId, buffers, () => {

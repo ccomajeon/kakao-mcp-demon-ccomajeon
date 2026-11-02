@@ -10,13 +10,14 @@ import type { KakaoSession } from '@kakao-mcp/core';
 import { agentMessageAdapter, registerAgentMessageTools } from './tools/agent-messages.ts';
 import { McpStdioServer } from './mcp-stdio.ts';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';
+import { approvalMessage } from './client-approval.ts';
 
 test('one send_message call prepares and asks; the same requestId sends after approval, uncertainty is final and contents are never read', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-agent-message-'));
   const journal = AgentSendJournal.open(root); t.after(() => { journal.close(); fs.rmSync(root, { recursive: true, force: true }); });
   const approvals = fixtureApprovals(journal, root); let sends = 0, fail = false;
   const session = {
-    selfUserId: '123456789', getState: () => ({ connected: true }), listChats: () => [{ id: '123456789', maxLogId: '9007199254740992', memberCount: 2 }],
+    selfUserId: '123456789', getState: () => ({ connected: true }), listChats: () => [{ id: '123456789', type: 'DirectChat', title: 'fixture 홍길동', maxLogId: '9007199254740992', memberCount: 2 }],
     sendMessage: async () => { sends++; if (fail) throw new Error('fixture connection lost'); return { status: 0, logId: '9007199254740993' }; }
   } as unknown as KakaoSession;
   const policy = new SendPolicy({ ceiling: ['123456789'], pausedAtStart: false, auditLogPath: path.join(root, 'audit') });
@@ -35,6 +36,9 @@ test('one send_message call prepares and asks; the same requestId sends after ap
   assert.equal(asked.structuredContent.error.code, 'APPROVAL_REQUIRED'); assert.equal(sends, 0);
   const approval = asked.structuredContent.error.details.approval;
   assert.equal(approval.requestId, input.requestId); assert.equal(JSON.parse(approval.signingText).message.text, input.text);
+  // The person sees which room this goes to, not only its ID; the agent's own draft is not redacted.
+  assert.deepEqual(JSON.parse(approval.signingText).context.room, { title: 'fixture 홍길동', type: 'DirectChat', memberCount: 2 });
+  assert.ok(approvalMessage(approval.signingText)!.split('\n').includes('대상 fixture 홍길동 (1:1 · 2명, chatId 123456789)'));
   assert.equal((await call('send_message', input)).structuredContent.error.code, 'APPROVAL_REQUIRED'); assert.equal(sends, 0);
   for (const removed of [{ confirm: true }, { approvalSignature: 'A'.repeat(86) + '==' }]) {
     assert.equal((await call('send_message', { ...input, ...removed })).structuredContent.error.code, 'INVALID_ARGUMENT');

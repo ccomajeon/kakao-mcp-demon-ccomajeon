@@ -17,7 +17,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Readable, Writable } from 'node:stream';
-import { KakaoError, longReplacer, toKakaoError, type McpToolGroup } from '@kakao-mcp/core';
+import { KakaoError, longReplacer, redactApprovalForAgent, toKakaoError, type McpToolGroup } from '@kakao-mcp/core';
 
 export type { McpToolGroup };
 import { validateArgs } from './validate-args.ts';
@@ -468,11 +468,13 @@ export class McpStdioServer {
         } catch (error) { err = toKakaoError(error); }
       }
       const hint = err.retryable ? ' (retryable)' : '';
-      const recovery = err.toJSON().recovery;
+      const error = err.toJSON(), recovery = error.recovery;
       const next = recovery ? `\nNext step: ${recovery.message}` : '';
+      // The person reviews stored message content with the approval; the agent gets it only after approving.
+      if (error.details?.approval !== undefined) error.details = { ...error.details, approval: redactApprovalForAgent(error.details.approval) };
       return this.reply(write, id, this.result(modern, {
         content: [{ type: 'text', text: `Error [${err.code}]: ${err.message}${hint}${next}` }],
-        structuredContent: { error: err.toJSON() },
+        structuredContent: { error },
         isError: true
       }));
     }

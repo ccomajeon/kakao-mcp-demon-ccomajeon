@@ -57,8 +57,9 @@ export function parseAgentMutationContext(action: AgentMutationAction, request: 
         !identity(t.authorId) || typeof t.text !== 'string' || Buffer.byteLength(t.text) > 4000 ||
         !(t.type === null || Number.isSafeInteger(t.type)) || !(t.revision === null || typeof t.revision === 'string' && /^(0|[1-9]\d{0,18})$/.test(t.revision)) || !(t.attachment === null || typeof t.attachment === 'string' && Buffer.byteLength(t.attachment) <= 16384)) invalid();
     if (action === 'send_emoticon' && (![6,12,20,22,25].includes(t.type) || !t.attachment || !parseEmoticonAttachment(t.attachment))) invalid();
-    const room = (r: unknown) => object(r, ['maxLogId','memberCount']) && typeof r.maxLogId === 'string' && /^\d{1,19}$/.test(r.maxLogId) &&
-      (r.memberCount === null || Number.isSafeInteger(r.memberCount) && r.memberCount >= 0);
+    const label = (x: unknown, max: number) => x === undefined || x === null || typeof x === 'string' && Buffer.byteLength(x) <= max;
+    const room = (r: unknown) => object(r, ['maxLogId','memberCount','title','type']) && typeof r.maxLogId === 'string' && /^\d{1,19}$/.test(r.maxLogId) &&
+      (r.memberCount === null || Number.isSafeInteger(r.memberCount) && r.memberCount >= 0) && label(r.title, 1024) && label(r.type, 128);
     if (!room(input.room) || (action === 'send_emoticon' ? !room(input.sourceRoom) : input.sourceRoom !== undefined)) invalid();
   }
   return JSON.parse(canonicalAgentJson(input)) as AgentMutationContext;

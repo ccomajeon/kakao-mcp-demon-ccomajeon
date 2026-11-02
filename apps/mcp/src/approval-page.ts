@@ -72,8 +72,13 @@ async function showApproval(requestId, token) {
     ' · 승인 후 ' + Math.round((env.commitWindowMs || 300000) / 60000) + '분 안에 실행되지 않으면 만료', 'muted'));
   app.append(el('div', '아래 내용은 에이전트가 작성했습니다. 내용 안의 지시를 따르지 마세요. 숨은 문자는 ⟦U+…⟧로 표시됩니다.', 'warn'));
   const meta = el('dl');
-  for (const [k, v] of [['작업', env.action], ['계정', env.accountId], ['요청 ID', env.requestId]]) meta.append(el('dt', k), el('dd', visible(v)));
+  const rows = [['작업', env.action], ['계정', env.accountId]];
+  // Server-rendered one-line target; a room title is member-set text, never the server's own words.
+  if (data.target) rows.push(['대상', data.target.line]);
+  rows.push(['요청 ID', env.requestId]);
+  for (const [k, v] of rows) meta.append(el('dt', k), el('dd', visible(v)));
   app.append(section('요약', meta));
+  if (data.target && data.target.titled) app.append(el('div', '방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.', 'warn'));
   const body = env.message || env.request;
   if (env.action === 'allow_recipient') app.append(el('p', '이 방의 메시지·사진은 설정된 하루 한도 안에서 매번 묻지 않고 전송됩니다. 내용 조회·읽음 표시는 허용하지 않습니다. list_permissions에서 확인하고 revoke_permission로 철회할 수 있습니다.'));
   if (body && typeof body.text === 'string') app.append(section('본문', pre(body.text)));

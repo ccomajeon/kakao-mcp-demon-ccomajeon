@@ -5,7 +5,7 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { KakaoError, approvalChallenge, rpIdForOrigin, verifyWebAuthnRegistration, type ApproverRegistry } from '@kakao-mcp/core';
 import type { ApprovalCenter } from './approval-center.ts';
-import { approvalLabel } from './client-approval.ts';
+import { approvalLabel, approvalTarget } from './client-approval.ts';
 import { checkEnrollment, clearEnrollment } from './enrollment.ts';
 import { PAGE_CSS, PAGE_HTML, PAGE_JS } from './approval-page.ts';
 
@@ -56,7 +56,7 @@ export function createApprovalServer(opts: ApprovalServerOptions): http.Server {
         if (req.method === 'GET' && !sub) {
           const pending = opts.center.get(requestId, token(req));
           const envelope = JSON.parse(pending.signingText);
-          return json(res, 200, { requestId, code: pending.code, expiresAt: pending.expiresAt, envelope, label: approvalLabel(envelope.action),
+          return json(res, 200, { requestId, code: pending.code, expiresAt: pending.expiresAt, envelope, label: approvalLabel(envelope.action), target: approvalTarget(envelope) ?? null,
             challenge: approvalChallenge(pending.signingText).toString('base64url'), rpId,
             allowCredentials: opts.registry.list().filter(x => x.rpId === rpId).map(x => x.id), media: pending.media.length, rememberable: !!opts.center.rememberable(pending) });
         }

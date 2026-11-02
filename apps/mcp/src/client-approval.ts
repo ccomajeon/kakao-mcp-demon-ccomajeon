@@ -44,6 +44,28 @@ export function registerApprovalLabels(labels: Record<string, string>): void {
 }
 export function approvalLabel(action: string): string { return LABELS[action] ?? action; }
 
+const ROOM_TYPES: Record<string, string> = { DirectChat: '1:1', MultiChat: '그룹', OM: '오픈채팅 그룹', OD: '오픈채팅 1:1', MemoChat: '나와의 채팅', PlusChat: '채널' };
+// Room titles are set by any member: keep them on one line so a title cannot add lines that look like the server's own.
+const oneLine = (value: unknown) => String(value).replace(/[\r\n\u2028\u2029]+/g, ' ⏎ ');
+/**
+ * The reviewed target as one line, e.g. `가족방 (그룹 · 12명, chatId 123)`. The title, type and count are the
+ * locally known room metadata bound into the envelope; `titled` says the line carries member-set (untrusted) text.
+ */
+export function approvalTarget(envelope: Record<string, any>): { line: string; titled: boolean } | undefined {
+  const body = envelope.message ?? envelope.request ?? {}, room = envelope.context?.room;
+  const chatId = envelope.context?.chatId ?? body.chatId ?? envelope.context?.target?.chatId;
+  const reviewed = room && typeof room === 'object' && ('title' in room || 'type' in room);
+  if (!reviewed) {
+    const raw = chatId ?? body.userId;
+    return raw == null ? undefined : { line: oneLine(raw), titled: false };
+  }
+  const type = typeof room.type === 'string' ? ROOM_TYPES[room.type] ?? room.type : undefined;
+  const kind = [type, Number.isSafeInteger(room.memberCount) ? `${room.memberCount}명` : undefined].filter(x => x !== undefined).join(' · ');
+  const facts = [kind, chatId != null ? `chatId ${chatId}` : ''].filter(Boolean).join(', ');
+  const titled = typeof room.title === 'string' && room.title.length > 0;
+  return { line: oneLine(`${titled ? room.title : '(방 이름 모름)'}${facts ? ` (${facts})` : ''}`), titled };
+}
+
 /**
  * Human-readable, server-rendered summary of the exact signed text. Undefined when it does not fit.
  * `asRoomPermission`: a photo cannot be shown, so it is asked as the room's send permission instead.
@@ -52,10 +74,10 @@ export function approvalMessage(signingText: string, confirmCode?: string, asRoo
   const e = JSON.parse(signingText) as Record<string, any>;
   if (OPAQUE_ACTIONS.has(e.action) && !asRoomPermission) return undefined;
   const body = e.message ?? e.request ?? {};
-  // Room titles are set by any member: keep them on one line so a title cannot add lines that look like the server's own.
-  const rawRoom = e.context?.room?.title ?? e.context?.target?.chatId ?? body.chatId ?? body.userId;
-  const room = rawRoom == null ? undefined : String(rawRoom).replace(/[\r\n\u2028\u2029]+/g, ' ⏎ ');
-  const lines = [`[kakao-mcp] ${approvalLabel(asRoomPermission ? 'allow_recipient' : e.action)} 승인 요청`, `계정 ${e.accountId}`, ...(room ? [`대상 ${room}`] : [])];
+  const target = approvalTarget(e);
+  const lines = [`[kakao-mcp] ${approvalLabel(asRoomPermission ? 'allow_recipient' : e.action)} 승인 요청`, `계정 ${e.accountId}`,
+    ...(target ? [`대상 ${target.line}`] : []),
+    ...(target?.titled ? ['(방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.)'] : [])];
   if (typeof body.text === 'string') lines.push('', '내용:', body.text);
   if (e.action === 'read_room') lines.push('', `이 방의 메시지를 이번 한 번만 AI에게 보여 줍니다(최대 ${body.maxMessages}개, ${body.ttlMinutes}분 안에 ${body.uses}회). 읽음 표시는 보내지 않습니다.`,
     '"이 방은 앞으로 묻지 않고 읽기"를 켜면 다음부터 묻지 않습니다. "이 방에 답장도 묻지 않고 보내기"를 켜면 이 방의 메시지·사진을 하루 한도 안에서 바로 보냅니다.',
