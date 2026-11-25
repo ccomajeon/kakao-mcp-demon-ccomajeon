@@ -66,3 +66,22 @@ test('add stores the returned friend on status 0', async (t) => {
   await friends.add(CREDS, '123456789');
   assert.equal(friends.get('123456789')?.nickName, '홍길동');
 });
+
+test('name resolution matches nicknames only and never guesses between several friends', () => {
+  const { friends } = store([
+    { userId: '111111111', nickName: 'fixture 본인', friendNickName: '엄마', type: 1 },
+    { userId: '222222222', nickName: '엄마', type: 1 },
+    { userId: '333333333', nickName: 'fixture 상태', statusMessage: '홍길동 친구', type: 1 },
+    { userId: '444444444', nickName: '홍길동', type: 1 }
+  ] as Array<{ userId: string; nickName: string; type?: number }>);
+  // Someone who renamed themselves to the saved name makes the name ambiguous: candidates, no pick.
+  const mom = friends.resolve('엄마');
+  assert.equal(mom.ambiguous, true); assert.equal(mom.friend, undefined);
+  assert.deepEqual(mom.candidates.map((f) => f.userId).sort(), ['111111111', '222222222']);
+  assert.equal(friends.find('엄마'), undefined);
+  // A status message never matches; the only nickname match is unique.
+  assert.equal(friends.find('홍길동')?.userId, '444444444');
+  assert.equal(friends.resolve('친구').candidates.length, 0);
+  // An exact userId is always unique.
+  assert.equal(friends.find('222222222')?.userId, '222222222');
+});

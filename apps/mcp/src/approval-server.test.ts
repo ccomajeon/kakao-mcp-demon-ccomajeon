@@ -90,8 +90,10 @@ test('a prepared send is approved on the page with a passkey, notified without c
   assert.equal((await h.request('GET', api, { headers: { 'x-approval-token': token, host: 'attacker.example.test' } })).status, 421);
   const view = await h.request('GET', api, { headers: { 'x-approval-token': token } });
   assert.equal(view.status, 200); assert.equal(view.json.envelope.message.text, message.text);
-  // The target room is server-rendered on one line; its member-set title is flagged as untrusted.
-  assert.deepEqual(view.json.target, { line: 'fixture 가족방 ⏎ 승인됨 (그룹 · 12명, chatId 123456789)', titled: true });
+  // The target room is server-rendered on one line: server facts first, the member-set title last, quoted and flagged.
+  assert.deepEqual(view.json.target, { line: '그룹 · 12명 · chatId 123456789 · 이름 "fixture 가족방 ⏎ 승인됨"(참여자가 정한 이름)', titled: true,
+    note: '(방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.)' });
+  assert.deepEqual(view.json.redacted, []); // nothing stored for review: the token shows the exact envelope
   assert.deepEqual(view.json.envelope.context.room, { title: 'fixture 가족방\n승인됨', type: 'MultiChat', memberCount: 12 });
   assert.match(String(view.headers['content-security-policy']), /script-src 'self'/);
   assert.deepEqual(view.json.allowCredentials, [device.credentialId]);

@@ -162,14 +162,25 @@ export class FriendsStore {
   }
 
   /**
-   * Find a single friend by userId or name query.
+   * Resolve a userId or name to one friend. Names match only nicknames (the friend's own and the name saved for them),
+   * never status messages, and anyone can rename themselves: a name that matches more than one friend is ambiguous
+   * and yields the candidates instead of a guess.
    */
-  find(queryOrUserId: string): KakaoFriend | undefined {
+  resolve(queryOrUserId: string, limit = 10): { friend?: KakaoFriend; ambiguous: boolean; candidates: KakaoFriend[] } {
     const trimmed = queryOrUserId.trim();
-    if (this.friends.has(trimmed)) return this.friends.get(trimmed);
+    const exact = this.friends.get(trimmed);
+    if (exact) return { friend: exact, ambiguous: false, candidates: [exact] };
+    const q = trimmed.toLowerCase();
+    if (!q) return { ambiguous: false, candidates: [] };
+    const matches = Array.from(this.friends.values()).filter((f) =>
+      [f.friendNickName, f.nickName].some((n) => typeof n === 'string' && n.toLowerCase().includes(q)));
+    if (matches.length === 1) return { friend: matches[0], ambiguous: false, candidates: matches };
+    return { ambiguous: matches.length > 1, candidates: matches.slice(0, limit) };
+  }
 
-    const matches = this.search(trimmed, 1);
-    return matches[0];
+  /** A single friend by userId, or by a name that matches exactly one friend (see resolve()). */
+  find(queryOrUserId: string): KakaoFriend | undefined {
+    return this.resolve(queryOrUserId).friend;
   }
 
   /**

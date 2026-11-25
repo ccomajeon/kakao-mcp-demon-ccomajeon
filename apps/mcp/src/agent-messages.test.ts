@@ -38,7 +38,13 @@ test('one send_message call prepares and asks; the same requestId sends after ap
   assert.equal(approval.requestId, input.requestId); assert.equal(JSON.parse(approval.signingText).message.text, input.text);
   // The person sees which room this goes to, not only its ID; the agent's own draft is not redacted.
   assert.deepEqual(JSON.parse(approval.signingText).context.room, { title: 'fixture 홍길동', type: 'DirectChat', memberCount: 2 });
-  assert.ok(approvalMessage(approval.signingText)!.split('\n').includes('대상 fixture 홍길동 (1:1 · 2명, chatId 123456789)'));
+  assert.ok(approvalMessage(approval.signingText)!.split('\n').includes('대상 1:1 · 2명 · chatId 123456789 · 이름 "fixture 홍길동"(참여자가 정한 이름)'));
+  // The room title is another member's text: the agent's copy is marked untrusted, in structured and text content alike.
+  assert.equal(approval.untrusted, true); assert.match(approval.notice, /^UNTRUSTED THIRD-PARTY CONTENT/);
+  assert.deepEqual(approval.untrustedFields, ['context.room.title']);
+  const text = asked.content[0].text as string;
+  assert.ok(text.startsWith('Error [APPROVAL_REQUIRED]: '));
+  assert.deepEqual(JSON.parse(text.slice(text.indexOf('\nDetails: ') + 10)), asked.structuredContent.error.details);
   assert.equal((await call('send_message', input)).structuredContent.error.code, 'APPROVAL_REQUIRED'); assert.equal(sends, 0);
   for (const removed of [{ confirm: true }, { approvalSignature: 'A'.repeat(86) + '==' }]) {
     assert.equal((await call('send_message', { ...input, ...removed })).structuredContent.error.code, 'INVALID_ARGUMENT');

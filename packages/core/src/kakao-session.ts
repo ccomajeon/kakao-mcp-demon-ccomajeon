@@ -55,6 +55,7 @@ import { LocalVault } from './local-vault.ts';
 import { FriendsStore, type KakaoFriend } from './friends.ts';
 import { KnownChats } from './known-chats.ts';
 import { KakaoDb } from './db.ts';
+import { DailyActionLimit } from './daily-action-limit.ts';
 import { loadConfig, describeConfig, type KakaoConfig } from './config.ts';
 import { KakaoError, locoStatusError, toKakaoError } from './errors.ts';
 import { backfillHistory, mchatLogsSource } from './history-sync.ts';
@@ -78,8 +79,13 @@ export type { ChatSummary } from './chat-registry.ts';
 export type LeftReason = 'leave_chat' | 'other_device' | 'login_list';
 export type { BufferedMessage } from './message-feed.ts';
 
+/** Agent "delete for me" bounds (self_delete_messages). */
+export const HIDE_PER_CALL = 50;
+export const HIDE_DAILY_LIMIT = 200;
+
 export class KakaoSession {
   readonly config: KakaoConfig;
+  private hideLimit: DailyActionLimit | undefined;
   private readonly creds: CredentialStore;
   private readonly logSink?: (line: string) => void;
   private readonly session: ResilientLocoSession;
@@ -287,8 +293,11 @@ export class KakaoSession {
   async openDirectChat(
     queryOrUserId: string,
     opts: { allowCreate?: boolean; beforeCreate?: (userId: string) => void } = {}
-  ): Promise<{ chatId: string | null; title: string; isNew: boolean; friend?: KakaoFriend }> {
-    const friend = this.friends.find(queryOrUserId);
+  ): Promise<{ chatId: string | null; title: string; isNew: boolean; friend?: KakaoFriend; ambiguous?: true; candidates?: KakaoFriend[] }> {
+    // A name several friends match (anyone can rename themselves) is never guessed: the caller picks a userId.
+    const resolved = this.friends.resolve(queryOrUserId);
+    if (resolved.ambiguous) return { chatId: null, title: '', isNew: false, ambiguous: true, candidates: resolved.candidates };
+    const friend = resolved.friend;
     const targetUserId = friend ? friend.userId : (queryOrUserId.match(/^\d+$/) ? queryOrUserId : undefined);
     if (!targetUserId) {
       throw new KakaoError('NOT_FOUND', `Friend not found for "${queryOrUserId}"`, { details: { query: queryOrUserId } });
@@ -534,10 +543,27 @@ export class KakaoSession {
   /**
    * "Delete for me": hide messages in the local store only, as KakaoTalk does
    * ("현재 사용중인 기기에서만 삭제됩니다"). LOCO SELFDLMSG is answered with -300. Nothing is sent, so this works offline.
+   * Hiding also takes messages out of the person's own history, views and exports, so the agent tool is bounded: only
+   * messages stored in this room, only in a room whose content may be read now (operator ceiling and room rule; no
+   * one-time grant), at most HIDE_PER_CALL per call and HIDE_DAILY_LIMIT per local day. Nothing here unhides.
    */
-  hideMessages(chatId: string, logIds: string[]) {
-    const res = this.store.hideMessages(chatId, logIds);
-    this.log(`hide messages hidden=${res.hidden.length} already=${res.alreadyHidden.length} notStored=${res.notStored.length}`);
+  hideMessages(chatId: string, logIds: unknown[]) {
+    if (!Array.isArray(logIds) || !logIds.length || logIds.length > HIDE_PER_CALL ||
+        logIds.some(id => typeof id !== 'string' || !/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > 9223372036854775807n)) {
+      throw new KakaoError('INVALID_ARGUMENT', `logIds must be 1-${HIDE_PER_CALL} numeric message logIds`);
+    }
+    if (this.roomAccess.rule(chatId).unreadPreviewAfterLogId !== undefined) throw new KakaoError('POLICY_DENIED', 'Preview-only approval does not authorize hiding messages');
+    this.roomAccess.check(chatId);
+    const ids = [...new Set(logIds as string[])];
+    const missing = ids.filter(id => !this.store.getMessage(chatId, id)).length;
+    if (missing) throw new KakaoError('NOT_FOUND', `${missing} of the logIds are not stored in this room; nothing was hidden`);
+    const fresh = ids.length - this.store.hiddenIds(ids).size;
+    if (fresh > 0) {
+      this.hideLimit ??= new DailyActionLimit(this.db, { action: 'self_delete_messages', limit: HIDE_DAILY_LIMIT, timeZone: this.config.client.timeZone });
+      this.hideLimit.reserve(fresh);
+    }
+    const res = this.store.hideMessages(chatId, ids);
+    this.log(`hide messages hidden=${res.hidden.length} already=${res.alreadyHidden.length}`);
     return res;
   }
 

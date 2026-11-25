@@ -66,12 +66,14 @@ export function agentControlAdapter(kakao: AgentControlSession, policy: SendPoli
         case 'create_direct_chat': {
           notPaused(action, `create:user:${r.userId}`);
           const found = await kakao.openDirectChat(r.userId, { allowCreate: false });
+          if (found.ambiguous) throw new KakaoError('INVALID_ARGUMENT', 'The numeric userId matches several friends\' names; resolve it explicitly first');
           if (found.friend && found.friend.userId !== r.userId) throw new KakaoError('INVALID_ARGUMENT', 'The numeric userId also matches another friend; resolve it explicitly first');
           if (found.chatId) throw new KakaoError('INVALID_ARGUMENT', 'A 1:1 chat with this user is already loaded; use open_direct_chat');
           return user(r as { userId: string }, () => allowed(policy.authorizeAction(`create:user:${r.userId}`, 'create_direct_chat')), async () => {
             const out = await kakao.openDirectChat(r.userId, { allowCreate: true, beforeCreate: target => {
               if (target !== r.userId) throw new KakaoError('INVALID_ARGUMENT', 'CREATE target differs from the approved user');
             } });
+            if (out.ambiguous) throw new KakaoError('INVALID_ARGUMENT', 'The numeric userId matches several friends\' names; nothing was created');
             if (!out.chatId) throw new KakaoError('INTERNAL', 'CREATE returned no chat');
             return { status: 0, result: { chatId: out.chatId, isNew: out.isNew } };
           });

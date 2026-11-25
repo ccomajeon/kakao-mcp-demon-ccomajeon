@@ -39,8 +39,10 @@ export function normalizeAgentPublication(action: AgentPublicationAction, raw: A
     let descriptor: AgentPublicationDescriptor;
     if (action === 'forward_message') {
       fields(raw, ['chatId','text','type','extra']);
+      // Text only: a media forward would reuse attachment tokens the person never sees in a text approval
+      // (photos are approved through room permission or the passkey preview, never as JSON in a dialog).
+      if (raw.type !== undefined && raw.type !== 1) throw new KakaoError('INVALID_ARGUMENT', 'forward_message forwards text (type 1) only; send photos and files with send_photos');
       if (typeof raw.text !== 'string' || !raw.text.trim() || Buffer.byteLength(raw.text) > 4000 ||
-          raw.type !== undefined && (!Number.isSafeInteger(raw.type) || raw.type < 1 || raw.type > 255) ||
           raw.extra !== undefined && (typeof raw.extra !== 'string' || Buffer.byteLength(raw.extra) > 32768)) fail();
       descriptor = { chatId: raw.chatId, text: raw.text, type: raw.type ?? 1, ...(raw.extra !== undefined ? { extra: raw.extra } : {}) };
     } else if (action === 'send_media') {

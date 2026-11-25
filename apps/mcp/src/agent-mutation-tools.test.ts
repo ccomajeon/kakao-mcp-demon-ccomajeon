@@ -7,7 +7,11 @@ import { randomUUID } from 'node:crypto';
 import { PassThrough, Writable } from 'node:stream';
 import { AgentMutationService, AgentSendJournal, ApprovalStore, ApproverRegistry, KakaoError, SendPolicy, type KakaoSession } from '@kakao-mcp/core';
 import { setup, CHAT, SELF } from '../../../packages/core/src/kakao-session-fixture.test-helper.ts';
+import http from 'node:http';
+import { approvalChallenge } from '@kakao-mcp/core';
+import { fixtureAuthenticator } from '../../../packages/core/src/webauthn-fixture.test-helper.ts';
 import { ApprovalCenter, setApprovalCenter } from './approval-center.ts';
+import { createApprovalServer } from './approval-server.ts';
 import { approvalMessage } from './client-approval.ts';
 import { agentMutationAdapter, registerAgentMutationTools } from './tools/agent-mutations.ts';
 import { McpStdioServer } from './mcp-stdio.ts';
@@ -70,12 +74,15 @@ test('a read refusal while checking the target says what to do next for manual a
   await assert.rejects(service.prepare('delete_message',randomUUID(),request),(e:Error)=>/closed to reading/.test(e.message)&&!/confirmRead=true/.test(e.message));
 });
 
+const ORIGIN = 'http://localhost:8788';
 test('a manual-room message read for review reaches the person, never the agent before approval', async t => {
   const { kakao, fake, dir } = setup({}, [], false);
-  const journal = AgentSendJournal.open(path.join(dir, 'journal')), store = new ApprovalStore(journal, new ApproverRegistry(dir));
-  const center = new ApprovalCenter({ store, origin: 'http://localhost:8788' });
+  const registry = new ApproverRegistry(dir), journal = AgentSendJournal.open(path.join(dir, 'journal')), store = new ApprovalStore(journal, registry);
+  const center = new ApprovalCenter({ store, origin: ORIGIN });
   setApprovalCenter(center, store);
-  t.after(() => { setApprovalCenter(undefined); center.close(); journal.close(); kakao.stop(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const page = createApprovalServer({ center, registry, origin: ORIGIN, dataDir: dir, listen: '127.0.0.1:8788' });
+  await new Promise<void>(resolve => page.listen(0, '127.0.0.1', resolve));
+  t.after(() => { page.close(); setApprovalCenter(undefined); center.close(); journal.close(); kakao.stop(); fs.rmSync(dir, { recursive: true, force: true }); });
   fake.connect();
   fake.emit('message', { chatId: CHAT, authorId: SELF, messageId: '9100', type: 1, text: 'fixture-stored-only-for-review', sendAt: 91, raw: {} });
   kakao.setRoomAccess(CHAT, { mode: 'manual' });
@@ -99,5 +106,39 @@ test('a manual-room message read for review reaches the person, never the agent 
   const pending = center.get(args.requestId, token);
   assert.equal(JSON.parse(pending.signingText).context.target.text, 'fixture-stored-only-for-review');
   assert.ok(approvalMessage(pending.signingText)?.includes('fixture-stored-only-for-review'), 'and so does the client dialog');
+
+  // The approval link (and so its token) is in the agent's hands: the token alone gets the same redacted copy,
+  // and no hash of the exact text to test guesses against. The person reveals the content with a passkey first.
+  const device = fixtureAuthenticator();
+  registry.add({ kind: 'webauthn', id: device.credentialId, publicKey: device.publicKey, alg: device.alg, rpId: 'localhost', origin: ORIGIN,
+    label: 'fixture', createdAt: new Date(0).toISOString(), signCount: 0 });
+  const port = (page.address() as { port: number }).port, api = `/api/approvals/${args.requestId}`, headers = { 'x-approval-token': token };
+  const request = (method: string, p: string, body?: unknown) => new Promise<{ status: number; text: string; json: any }>((resolve, reject) => {
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    const req = http.request({ host: '127.0.0.1', port, method, path: p, headers: { host: 'localhost:8788', ...headers, ...(payload ? { 'content-type': 'application/json', origin: ORIGIN } : {}) } }, res => {
+      let text = ''; res.on('data', c => { text += c; }); res.on('end', () => resolve({ status: res.statusCode!, text, json: JSON.parse(text) }));
+    });
+    req.on('error', reject); if (payload) req.write(payload); req.end();
+  });
+  const view = await request('GET', api);
+  assert.equal(view.status, 200); assert.equal(view.text.includes('fixture-stored-only-for-review'), false);
+  assert.equal(view.json.envelope.context.target.text, '[redacted until the person approves]');
+  assert.deepEqual(view.json.redacted, ['context.target.text']);
+  assert.equal(view.json.challenge, null);
+  assert.notEqual(view.json.revealChallenge, approvalChallenge(pending.signingText).toString('base64url'));
+  const revealChallenge = Buffer.from(view.json.revealChallenge, 'base64url');
+  // No user verification, or an assertion made for approving, reveals nothing.
+  assert.equal((await request('POST', `${api}/reveal`, device.assert(revealChallenge, ORIGIN, { flags: 0x01 }))).status, 403);
+  assert.equal((await request('POST', `${api}/reveal`, device.assert(approvalChallenge(pending.signingText), ORIGIN))).status, 403);
+  // A reveal assertion never approves.
+  assert.equal((await request('POST', `${api}/approve`, device.assert(revealChallenge, ORIGIN))).status, 403);
+  assert.equal(store.state(args.requestId), 'awaiting_approval');
+  const revealed = await request('POST', `${api}/reveal`, device.assert(revealChallenge, ORIGIN));
+  assert.equal(revealed.status, 200, revealed.text);
+  assert.equal(revealed.json.envelope.context.target.text, 'fixture-stored-only-for-review');
+  assert.equal(revealed.json.challenge, approvalChallenge(pending.signingText).toString('base64url'));
+  // Approving still binds the exact, unredacted envelope.
+  assert.equal((await request('POST', `${api}/approve`, device.assert(Buffer.from(revealed.json.challenge, 'base64url'), ORIGIN))).status, 200);
+  assert.equal(store.approvalTime(args.requestId, pending.signingText) !== undefined, true);
   assert.equal(fake.calls.filter(c => c.method === 'deleteMessage').length, 0);
 });
