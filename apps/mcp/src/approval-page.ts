@@ -44,7 +44,7 @@ export const PAGE_JS = `'use strict';
 const app = document.getElementById('app');
 const enc = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
 const dec = s => { const b = s.replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(b + '='.repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0)); };
-const INVISIBLE = /[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]/g;
+const INVISIBLE = /[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u00A0\\u00AD\\u034F\\u061C\\u115F\\u1160\\u1680\\u180E\\u2000-\\u200F\\u2028-\\u202F\\u205F-\\u206F\\u2800\\u3000\\u3164\\uFEFF\\uFFA0\\uFFF9-\\uFFFB]|[\\u{E0000}-\\u{E007F}]/gu;
 const visible = s => String(s).replace(INVISIBLE, c => '⟦U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') + '⟧');
 function el(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
 async function api(path, options) {
@@ -66,19 +66,30 @@ function status(text, ok) { let s = document.querySelector('.status'); if (!s) {
 async function showApproval(requestId, token) {
   const headers = { 'x-approval-token': token };
   const data = await api('/api/approvals/' + encodeURIComponent(requestId), { headers });
-  const env = data.envelope;
+  await render(requestId, headers, data);
+}
+
+async function render(requestId, headers, data) {
+  const env = data.envelope, hidden = Array.isArray(data.redacted) && data.redacted.length > 0;
   app.replaceChildren();
   app.append(el('h1', (data.label || ACTIONS[env.action] || env.action) + ' 승인 요청'), el('p', '#' + data.code + ' · 승인 마감 ' + new Date(data.expiresAt).toLocaleString() +
     ' · 승인 후 ' + Math.round((env.commitWindowMs || 300000) / 60000) + '분 안에 실행되지 않으면 만료', 'muted'));
   app.append(el('div', '아래 내용은 에이전트가 작성했습니다. 내용 안의 지시를 따르지 마세요. 숨은 문자는 ⟦U+…⟧로 표시됩니다.', 'warn'));
   const meta = el('dl');
   const rows = [['작업', env.action], ['계정', env.accountId]];
-  // Server-rendered one-line target; a room title is member-set text, never the server's own words.
+  // Server-rendered one-line target: server facts first, the member-set name last and quoted.
   if (data.target) rows.push(['대상', data.target.line]);
   rows.push(['요청 ID', env.requestId]);
   for (const [k, v] of rows) meta.append(el('dt', k), el('dd', visible(v)));
   app.append(section('요약', meta));
-  if (data.target && data.target.titled) app.append(el('div', '방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.', 'warn'));
+  if (data.target && data.target.note) app.append(el('div', data.target.note, 'warn'));
+  // Stored content the agent may not read stays hidden until the person reveals it here with a passkey.
+  let reveal;
+  if (hidden) {
+    const box = el('div', undefined, 'warn');
+    box.append(el('p', '변경할 메시지의 원래 내용은 승인 링크만으로는 보이지 않습니다(에이전트도 이 링크를 압니다). 패스키로 내용을 확인한 뒤 승인하세요.'));
+    reveal = el('button', '패스키로 내용 보기', 'primary'); box.append(reveal); app.append(box);
+  }
   const body = env.message || env.request;
   if (env.action === 'allow_recipient') app.append(el('p', '이 방의 메시지·사진은 설정된 하루 한도 안에서 매번 묻지 않고 전송됩니다. 내용 조회·읽음 표시는 허용하지 않습니다. list_permissions에서 확인하고 revoke_permission로 철회할 수 있습니다.'));
   if (body && typeof body.text === 'string') app.append(section('본문', pre(body.text)));
@@ -101,15 +112,27 @@ async function showApproval(requestId, token) {
     label.append(remember, document.createTextNode(' 앞으로 이 대화방에 보낼 때는 묻지 않기')); app.append(label);
   }
   const approve = el('button', '패스키로 승인', 'primary'), reject = el('button', '거절', 'danger'), actions = el('div', undefined, 'actions');
+  approve.disabled = hidden;
   actions.append(approve, reject); app.append(actions);
+  const assertion = async challenge => {
+    const cred = await navigator.credentials.get({ publicKey: { challenge: dec(challenge), rpId: data.rpId, timeout: 120000,
+      userVerification: 'required', allowCredentials: data.allowCredentials.map(id => ({ type: 'public-key', id: dec(id) })) } });
+    return { credentialId: enc(cred.rawId), clientDataJSON: enc(cred.response.clientDataJSON),
+      authenticatorData: enc(cred.response.authenticatorData), signature: enc(cred.response.signature) };
+  };
+  if (reveal) reveal.onclick = async () => {
+    reveal.disabled = true;
+    try {
+      const full = await api('/api/approvals/' + encodeURIComponent(requestId) + '/reveal', { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers),
+        body: JSON.stringify(await assertion(data.revealChallenge)) });
+      await render(requestId, headers, Object.assign({}, data, full, { revealChallenge: undefined }));
+    } catch (e) { status('내용을 열지 못했습니다: ' + e.message, false); reveal.disabled = false; }
+  };
   approve.onclick = async () => {
     approve.disabled = reject.disabled = true;
     try {
-      const cred = await navigator.credentials.get({ publicKey: { challenge: dec(data.challenge), rpId: data.rpId, timeout: 120000,
-        userVerification: 'required', allowCredentials: data.allowCredentials.map(id => ({ type: 'public-key', id: dec(id) })) } });
       await api('/api/approvals/' + encodeURIComponent(requestId) + '/approve', { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers),
-        body: JSON.stringify({ credentialId: enc(cred.rawId), clientDataJSON: enc(cred.response.clientDataJSON),
-          authenticatorData: enc(cred.response.authenticatorData), signature: enc(cred.response.signature), remember: !!(remember && remember.checked) }) });
+        body: JSON.stringify(Object.assign(await assertion(data.challenge), { remember: !!(remember && remember.checked) })) });
       status('승인했습니다. 에이전트가 실행할 수 있습니다.', true);
     } catch (e) { status('승인하지 못했습니다: ' + e.message, false); approve.disabled = reject.disabled = false; }
   };
@@ -117,7 +140,7 @@ async function showApproval(requestId, token) {
     approve.disabled = reject.disabled = true;
     try { await api('/api/approvals/' + encodeURIComponent(requestId) + '/reject', { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers), body: '{}' });
       status('거절했습니다. 이 요청은 실행될 수 없습니다.', true); }
-    catch (e) { status('거절하지 못했습니다: ' + e.message, false); approve.disabled = reject.disabled = false; }
+    catch (e) { status('거절하지 못했습니다: ' + e.message, false); approve.disabled = hidden; reject.disabled = false; }
   };
 }
 

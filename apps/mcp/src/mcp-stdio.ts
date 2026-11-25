@@ -21,6 +21,7 @@ import { KakaoError, longReplacer, redactApprovalForAgent, toKakaoError, type Mc
 
 export type { McpToolGroup };
 import { validateArgs } from './validate-args.ts';
+import { markUntrusted } from './untrusted.ts';
 import { clientName, type ClientApprovalGate, type ClientContext, type ApprovalDetails } from './client-approval.ts';
 
 /** The protocol revision we advertise; we echo the client's if it sends a known one. */
@@ -471,9 +472,16 @@ export class McpStdioServer {
       const error = err.toJSON(), recovery = error.recovery;
       const next = recovery ? `\nNext step: ${recovery.message}` : '';
       // The person reviews stored message content with the approval; the agent gets it only after approving.
-      if (error.details?.approval !== undefined) error.details = { ...error.details, approval: redactApprovalForAgent(error.details.approval) };
+      // Room titles and nicknames left in the agent's copy are other users' text: marked untrusted like read results.
+      if (error.details?.approval !== undefined) {
+        const approval = redactApprovalForAgent(error.details.approval) as Record<string, unknown>;
+        const remote = Array.isArray(approval?.untrustedFields) && approval.untrustedFields.length > 0;
+        error.details = { ...error.details, approval: remote ? markUntrusted(approval) : approval };
+      }
+      // The text carries the same details as structuredContent, for clients that show the model only text.
+      const details = error.details ? `\nDetails: ${JSON.stringify(error.details, longReplacer)}` : '';
       return this.reply(write, id, this.result(modern, {
-        content: [{ type: 'text', text: `Error [${err.code}]: ${err.message}${hint}${next}` }],
+        content: [{ type: 'text', text: `Error [${err.code}]: ${err.message}${hint}${next}${details}` }],
         structuredContent: { error },
         isError: true
       }));

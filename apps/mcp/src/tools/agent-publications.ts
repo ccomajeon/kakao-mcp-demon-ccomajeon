@@ -60,9 +60,10 @@ export function registerAgentPublicationTools(server: McpStdioServer, service: (
     name: 'forward_message',
     group: 'chats',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    description: 'Forward exact message text with its bounded attachment JSON to one exact room. Always needs the person\'s approval, even in an allowed room. ' + OUTCOME,
+    description: 'Forward exact message text (type 1 only) with its bounded attachment JSON to one exact room. Media forwards are refused: send photos and files with send_photos. ' +
+      'Always needs the person\'s approval, even in an allowed room. ' + OUTCOME,
     inputSchema: { type: 'object', properties: {
-      requestId: REQUEST_ID, chatId: { type: 'string' }, text: { type: 'string' }, type: { type: 'number' },
+      requestId: REQUEST_ID, chatId: { type: 'string' }, text: { type: 'string' }, type: { type: 'number', description: 'Message type; only 1 (text) is accepted.' },
       extra: { type: 'string', description: 'Exact bounded attachment JSON string; not proof of attachment provenance.' }
     }, required: ['requestId', 'chatId', 'text'], additionalProperties: false },
     handler: args => {

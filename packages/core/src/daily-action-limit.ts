@@ -10,10 +10,12 @@ export class DailyActionLimit {
   readonly limit: number;
   private readonly timeZone: string;
   private readonly now: () => number;
+  /** The setting that changes the limit, named in the refusal; omitted for a fixed limit. */
+  private readonly setting: string | undefined;
 
-  constructor(db: KakaoDb, opts: { action: string; limit: number; timeZone: string; now?: () => number }) {
+  constructor(db: KakaoDb, opts: { action: string; limit: number; timeZone: string; now?: () => number; setting?: string }) {
     if (!Number.isSafeInteger(opts.limit) || opts.limit < 1) throw new KakaoError('CONFIG_INVALID', `Daily limit for ${opts.action} must be a positive whole number`);
-    this.db = db; this.action = opts.action; this.limit = opts.limit; this.timeZone = opts.timeZone; this.now = opts.now ?? Date.now;
+    this.db = db; this.action = opts.action; this.limit = opts.limit; this.timeZone = opts.timeZone; this.now = opts.now ?? Date.now; this.setting = opts.setting;
   }
   private day(): string { return new Intl.DateTimeFormat('en-CA', { timeZone: this.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(this.now()); }
   usedToday(): number {
@@ -21,20 +23,21 @@ export class DailyActionLimit {
   }
   private refuse(used: number): KakaoError {
     // Not retryable: the same call fails until the local day changes.
-    return new KakaoError('RATE_LIMITED', `Daily ${this.action} limit reached (${used}/${this.limit}, KAKAO_ADD_FRIEND_DAILY_LIMIT); try again tomorrow. Do not retry in a loop.`,
+    return new KakaoError('RATE_LIMITED', `Daily ${this.action} limit reached (${used}/${this.limit}${this.setting ? `, ${this.setting}` : ''}); try again tomorrow. Do not retry in a loop.`,
       { retryable: false, details: { action: this.action, limit: this.limit, usedToday: used } });
   }
   /** Fail before asking a person to approve something the cap would refuse anyway. */
-  check(): void {
+  check(count = 1): void {
     const used = this.usedToday();
-    if (used >= this.limit) throw this.refuse(used);
+    if (used + count > this.limit) throw this.refuse(used);
   }
-  /** Take one slot after approval and before the effect. A slot is not returned if the effect then fails. */
-  reserve(): void {
+  /** Take `count` slots after approval and before the effect. Slots are not returned if the effect then fails. */
+  reserve(count = 1): void {
     this.db.transaction(() => {
       const used = this.usedToday();
-      if (used >= this.limit) throw this.refuse(used);
-      this.db.db.prepare('INSERT INTO account_action_uses (action, local_day, used_at) VALUES (?,?,?)').run(this.action, this.day(), this.now());
+      if (used + count > this.limit) throw this.refuse(used);
+      const insert = this.db.db.prepare('INSERT INTO account_action_uses (action, local_day, used_at) VALUES (?,?,?)');
+      for (let i = 0; i < count; i++) insert.run(this.action, this.day(), this.now());
     }, 'immediate');
   }
 }

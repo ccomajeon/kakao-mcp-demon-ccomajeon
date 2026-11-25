@@ -30,7 +30,9 @@ const code = () => [...randomBytes(4)].map(b => CODE_ALPHABET[b % CODE_ALPHABET.
 const STATE_TTL = 10 * 60_000;
 // Binary payloads cannot be shown in a text dialog: an unseen photo is never approved on its own; the dialog asks for the room's send permission instead.
 const OPAQUE_ACTIONS = new Set(['send_media', 'send_photo_bundle']);
-const INVISIBLE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u061C\u180E\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/g;
+// Control, format and bidi characters, plus blank fillers (Hangul fillers, braille blank, wide and no-break spaces,
+// tag characters) that render as nothing and could push the server's own words out of view.
+const INVISIBLE = /[\u0000-\u0008\u000B-\u001F\u007F-\u00A0\u00AD\u034F\u061C\u115F\u1160\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F-\u206F\u2800\u3000\u3164\uFEFF\uFFA0\uFFF9-\uFFFB]|[\u{E0000}-\u{E007F}]/gu;
 const visible = (s: string) => s.replace(INVISIBLE, c => `⟦U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}⟧`);
 const LABELS: Record<string, string> = {
   send_message: '메시지 보내기', forward_message: '전달', send_emoticon: '이모티콘 보내기', edit_message: '메시지 수정', delete_message: '메시지 삭제',
@@ -47,23 +49,46 @@ export function approvalLabel(action: string): string { return LABELS[action] ??
 const ROOM_TYPES: Record<string, string> = { DirectChat: '1:1', MultiChat: '그룹', OM: '오픈채팅 그룹', OD: '오픈채팅 1:1', MemoChat: '나와의 채팅', PlusChat: '채널' };
 // Room titles are set by any member: keep them on one line so a title cannot add lines that look like the server's own.
 const oneLine = (value: unknown) => String(value).replace(/[\r\n\u2028\u2029]+/g, ' ⏎ ');
+const NAME_LIMIT = 40;
 /**
- * The reviewed target as one line, e.g. `가족방 (그룹 · 12명, chatId 123)`. The title, type and count are the
- * locally known room metadata bound into the envelope; `titled` says the line carries member-set (untrusted) text.
+ * A room title or nickname as shown next to server facts: one line, at most 40 characters, hidden characters made
+ * visible, and quoted (a quote inside is escaped), so it cannot pass for the server-written part of the line.
  */
-export function approvalTarget(envelope: Record<string, any>): { line: string; titled: boolean } | undefined {
-  const body = envelope.message ?? envelope.request ?? {}, room = envelope.context?.room;
+export function quotedName(value: string): string {
+  const chars = [...oneLine(value)];
+  return JSON.stringify(visible(chars.length > NAME_LIMIT ? `${chars.slice(0, NAME_LIMIT).join('')}…` : chars.join('')));
+}
+export interface ApprovalTarget {
+  line: string;
+  /** The line ends with a member- or friend-set name (untrusted text). */
+  titled: boolean;
+  /** How to check the target without trusting that name. */
+  note?: string;
+}
+/**
+ * The reviewed target as one line. Server-known facts come first and the member-set name last, quoted and marked,
+ * e.g. `그룹 · 12명 · chatId 123 · 이름 "가족방"(참여자가 정한 이름)` or `친구 · userId 42 · 이름 "홍길동"(상대가 정한 이름)`.
+ */
+export function approvalTarget(envelope: Record<string, any>): ApprovalTarget | undefined {
+  const body = envelope.message ?? envelope.request ?? {}, room = envelope.context?.room, friend = envelope.context?.friend;
   const chatId = envelope.context?.chatId ?? body.chatId ?? envelope.context?.target?.chatId;
+  const userId = envelope.context?.userId ?? body.userId;
+  if (friend && typeof friend === 'object' && userId != null) {
+    const named = typeof friend.nickname === 'string' && friend.nickname.length > 0;
+    const facts = [friend.known === true ? '친구' : '친구 목록에 없음', `userId ${oneLine(userId)}`];
+    return { line: [...facts, ...(named ? [`이름 ${quotedName(friend.nickname)}(상대가 정한 이름)`] : [])].join(' · '), titled: named,
+      ...(named ? { note: '(이름은 상대가 정할 수 있는 글자라 믿을 수 없습니다. 친구 여부와 userId로 의도한 사람인지 확인하세요.)' } : {}) };
+  }
   const reviewed = room && typeof room === 'object' && ('title' in room || 'type' in room);
   if (!reviewed) {
     const raw = chatId ?? body.userId;
-    return raw == null ? undefined : { line: oneLine(raw), titled: false };
+    return raw == null ? undefined : { line: visible(oneLine(raw)), titled: false };
   }
-  const type = typeof room.type === 'string' ? ROOM_TYPES[room.type] ?? room.type : undefined;
-  const kind = [type, Number.isSafeInteger(room.memberCount) ? `${room.memberCount}명` : undefined].filter(x => x !== undefined).join(' · ');
-  const facts = [kind, chatId != null ? `chatId ${chatId}` : ''].filter(Boolean).join(', ');
+  const type = typeof room.type === 'string' ? ROOM_TYPES[room.type] ?? visible(oneLine(room.type)) : undefined;
   const titled = typeof room.title === 'string' && room.title.length > 0;
-  return { line: oneLine(`${titled ? room.title : '(방 이름 모름)'}${facts ? ` (${facts})` : ''}`), titled };
+  const facts = [type, Number.isSafeInteger(room.memberCount) ? `${room.memberCount}명` : undefined, chatId != null ? `chatId ${oneLine(chatId)}` : undefined];
+  return { line: [...facts.filter(x => x !== undefined), titled ? `이름 ${quotedName(room.title)}(참여자가 정한 이름)` : '이름 모름'].join(' · '), titled,
+    ...(titled ? { note: '(방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.)' } : {}) };
 }
 
 /**
@@ -77,7 +102,7 @@ export function approvalMessage(signingText: string, confirmCode?: string, asRoo
   const target = approvalTarget(e);
   const lines = [`[kakao-mcp] ${approvalLabel(asRoomPermission ? 'allow_recipient' : e.action)} 승인 요청`, `계정 ${e.accountId}`,
     ...(target ? [`대상 ${target.line}`] : []),
-    ...(target?.titled ? ['(방 이름은 참여자가 정한 글자라 믿을 수 없습니다. 방 종류·인원·chatId로 의도한 방인지 확인하세요.)'] : [])];
+    ...(target?.note ? [target.note] : [])];
   if (typeof body.text === 'string') lines.push('', '내용:', body.text);
   if (e.action === 'read_room') lines.push('', `이 방의 메시지를 이번 한 번만 AI에게 보여 줍니다(최대 ${body.maxMessages}개, ${body.ttlMinutes}분 안에 ${body.uses}회). 읽음 표시는 보내지 않습니다.`,
     '"이 방은 앞으로 묻지 않고 읽기"를 켜면 다음부터 묻지 않습니다. "이 방에 답장도 묻지 않고 보내기"를 켜면 이 방의 메시지·사진을 하루 한도 안에서 바로 보냅니다.',
@@ -105,8 +130,10 @@ export class ElicitationApprovals implements ClientApprovalGate {
   private readonly recipients: RecipientPermissions | undefined;
   /** Room read rules: a one-time read dialog may also open the room for later reads. */
   private readonly rooms: RoomReadOpener | undefined;
-  constructor(store: ApprovalStore, now: () => number = Date.now, recipients?: RecipientPermissions, rooms?: RoomReadOpener) {
-    this.store = store; this.now = now; this.recipients = recipients; this.rooms = rooms;
+  /** The operator ceiling (KAKAO_ROOM_CEILING): no standing permission is offered or stored for a room outside it. */
+  private readonly withinCeiling: (chatId: string) => boolean;
+  constructor(store: ApprovalStore, now: () => number = Date.now, recipients?: RecipientPermissions, rooms?: RoomReadOpener, withinCeiling: (chatId: string) => boolean = () => true) {
+    this.store = store; this.now = now; this.recipients = recipients; this.rooms = rooms; this.withinCeiling = withinCeiling;
   }
   private mac(data: string): Buffer { return createHmac('sha256', this.key).update(data).digest(); }
   private argsDigest(tool: string, args: Record<string, unknown>): string {
@@ -128,12 +155,12 @@ export class ElicitationApprovals implements ClientApprovalGate {
   request(tool: string, args: Record<string, unknown>, approval: ApprovalDetails, client: ClientContext): InputRequiredResult | undefined {
     if (!client.elicitation || approval.expiresAt <= this.now()) return undefined;
     const e = JSON.parse(approval.signingText) as Record<string, any>, chatId = e.message?.chatId;
-    const photoRoom = OPAQUE_ACTIONS.has(e.action) && this.recipients && typeof chatId === 'string' ? chatId as string : undefined;
+    const photoRoom = OPAQUE_ACTIONS.has(e.action) && this.recipients && typeof chatId === 'string' && this.withinCeiling(chatId) ? chatId as string : undefined;
     const confirmCode = code(), message = approvalMessage(approval.signingText, confirmCode, !!photoRoom);
     if (!message) return undefined;
     // Offer "don't ask again" only for sends an allowed recipient can cover, and only once the code is typed.
-    const rememberable = !photoRoom && !!this.recipients && (RECIPIENT_ACTIONS as readonly string[]).includes(e.action) && typeof chatId === 'string';
-    const readChat = e.action === 'read_room' && this.rooms && typeof e.request?.chatId === 'string' ? e.request.chatId as string : undefined;
+    const rememberable = !photoRoom && !!this.recipients && (RECIPIENT_ACTIONS as readonly string[]).includes(e.action) && typeof chatId === 'string' && this.withinCeiling(chatId);
+    const readChat = e.action === 'read_room' && this.rooms && typeof e.request?.chatId === 'string' && this.withinCeiling(e.request.chatId) ? e.request.chatId as string : undefined;
     const properties: Record<string, unknown> = {
       code: { type: 'string', title: '확인 코드', description: `승인하려면 ${confirmCode} 를 입력하세요. 비워 두면 승인되지 않습니다.`, minLength: 4, maxLength: 4 },
       ...(rememberable ? { remember: { type: 'boolean', title: '앞으로 이 대화방에 보낼 때는 묻지 않기', default: false } } : {}),
@@ -166,10 +193,12 @@ export class ElicitationApprovals implements ClientApprovalGate {
     // Validate/record before any permission side effect. Retries reuse approval, never regrant.
     if (this.store.recordClientConfirmation(s.requestId, s.digest, client.name) === false) return 'approved';
     // Accepting a photo's room dialog is the room's send permission, which already covers unseen photos.
-    if (typeof s.room === 'string' && this.recipients) this.recipients.grant(s.room, `client:${client.name}`);
-    if (r.content?.remember === true && typeof s.chat === 'string' && this.recipients) this.recipients.grant(s.chat, `client:${client.name}`);
-    if (r.content?.remember === true && typeof s.read === 'string' && this.rooms) this.rooms.allowRead(s.read, `client:${client.name}`);
-    if (r.content?.reply === true && typeof s.read === 'string' && this.recipients) this.recipients.grant(s.read, `client:${client.name}`);
+    // Checked again here: the ceiling may have narrowed while the dialog was open.
+    const inside = (chatId: unknown): chatId is string => typeof chatId === 'string' && this.withinCeiling(chatId);
+    if (inside(s.room) && this.recipients) this.recipients.grant(s.room, `client:${client.name}`);
+    if (r.content?.remember === true && inside(s.chat) && this.recipients) this.recipients.grant(s.chat, `client:${client.name}`);
+    if (r.content?.remember === true && inside(s.read) && this.rooms) this.rooms.allowRead(s.read, `client:${client.name}`);
+    if (r.content?.reply === true && inside(s.read) && this.recipients) this.recipients.grant(s.read, `client:${client.name}`);
     return 'approved';
   }
 

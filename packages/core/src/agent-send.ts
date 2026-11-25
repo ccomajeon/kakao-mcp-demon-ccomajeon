@@ -109,11 +109,27 @@ export function requireApproval(o: {
 /** Stored message fields a review envelope may carry: shown to the person, never to the agent before approval. */
 const STORED_CONTENT = ['text', 'attachment'] as const;
 export const REDACTED_FOR_AGENT = '[redacted until the person approves]';
+/** Keys under an envelope's `context` whose string values other KakaoTalk users can set (room titles, nicknames, stored content). */
+const REMOTE_AUTHORED = new Set(['title', 'nickname', 'name', 'statusMessage', 'text', 'attachment']);
+/** Paths of remote-authored strings in a review envelope's context, e.g. `context.room.title`. */
+export function remoteAuthoredFields(envelope: unknown): string[] {
+  const out: string[] = [];
+  const walk = (value: unknown, at: string, depth: number) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 4) return;
+    for (const [key, v] of Object.entries(value)) {
+      if (typeof v === 'string' && v.length > 0 && REMOTE_AUTHORED.has(key)) out.push(`${at}.${key}`);
+      else walk(v, `${at}.${key}`, depth + 1);
+    }
+  };
+  walk((envelope as Record<string, unknown> | null | undefined)?.context, 'context', 0);
+  return out;
+}
 /**
  * APPROVAL_REQUIRED details as returned to the agent. A change to a stored message carries that message's text and
  * attachment for the person's review, read with the approval-covered confirmRead (possibly in a room the agent may
  * not read). The agent gets a copy with those fields redacted (`reviewText`) and no `signingText`; the approval
- * digest, the client dialog and the passkey page keep the exact envelope.
+ * digest, the client dialog and the passkey page keep the exact envelope. `untrustedFields` lists the remaining
+ * remote-authored strings (room titles, nicknames) so a transport can mark the copy as untrusted data.
  */
 export function redactApprovalForAgent(approval: unknown): unknown {
   if (!approval || typeof approval !== 'object' || Array.isArray(approval)) return approval;
@@ -122,12 +138,14 @@ export function redactApprovalForAgent(approval: unknown): unknown {
   let envelope: Record<string, any>;
   try { envelope = JSON.parse(signingText) as Record<string, any>; } catch { return rest; }
   const target = envelope?.context?.target;
-  if (!target || typeof target !== 'object') return approval;
-  const fields = STORED_CONTENT.filter(k => typeof target[k] === 'string');
-  if (!fields.length) return approval;
+  const fields = target && typeof target === 'object' ? STORED_CONTENT.filter(k => typeof target[k] === 'string') : [];
+  if (!fields.length) {
+    const untrusted = remoteAuthoredFields(envelope);
+    return untrusted.length ? { ...approval, untrustedFields: untrusted } : approval;
+  }
   const redacted = { ...target, ...Object.fromEntries(fields.map(k => [k, REDACTED_FOR_AGENT])) };
-  return { ...rest, reviewText: canonicalAgentJson({ ...envelope, context: { ...envelope.context, target: redacted } }),
-    redacted: fields.map(k => `context.target.${k}`) };
+  const copy = { ...envelope, context: { ...envelope.context, target: redacted } }, untrusted = remoteAuthoredFields(copy).filter(p => !fields.some(k => p === `context.target.${k}`));
+  return { ...rest, reviewText: canonicalAgentJson(copy), redacted: fields.map(k => `context.target.${k}`), ...(untrusted.length ? { untrustedFields: untrusted } : {}) };
 }
 export interface AgentOperationDefinition<T extends { chatId: string }> {
   domain: string; action: string; parse(input: T): T; textLength(input: T): number; requireSignature?: boolean;

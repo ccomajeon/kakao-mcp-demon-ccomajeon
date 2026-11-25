@@ -2,13 +2,15 @@
 // notification to the configured destination. Drafts live only here (RAM), never on disk; a restart
 // drops them and the operator prepares again.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { KakaoError, RECIPIENT_ACTIONS, type ApprovalStore, type ApprovalEvent, type RecipientPermissions, type WebAuthnAssertion } from '@kakao-mcp/core';
+import { KakaoError, RECIPIENT_ACTIONS, approvalRevealChallenge, redactApprovalForAgent, type ApprovalStore, type ApprovalEvent, type RecipientPermissions, type WebAuthnAssertion } from '@kakao-mcp/core';
 
 export interface PendingApproval {
   requestId: string; code: string; action: string; expiresAt: number; signingText: string;
   /** Image bytes verified against the signed SHA-256 descriptor; wiped on removal. */
   media: Array<{ bytes: Buffer; type: 'image/jpeg' | 'image/png' }>;
   token: Buffer;
+  /** Binds a reveal assertion to this one pending approval. */
+  revealNonce: Buffer;
 }
 export interface OfferResult { approvalUrl: string; code: string; expiresAt: number }
 
@@ -53,7 +55,7 @@ export class ApprovalCenter {
     if (this.pending.size >= MAX_PENDING) return { approvalUrl: null, reason: `At most ${MAX_PENDING} operations can await passkey approval; wait for some to finish` };
     const envelope = JSON.parse(prepared.signingText) as Record<string, any>;
     const entry: PendingApproval = { requestId: prepared.requestId, code: shortCode(), action: String(envelope.action), expiresAt: prepared.expiresAt,
-      signingText: prepared.signingText, media: this.previews(envelope, media), token: randomBytes(18) };
+      signingText: prepared.signingText, media: this.previews(envelope, media), token: randomBytes(18), revealNonce: randomBytes(16) };
     this.pending.set(entry.requestId, entry);
     const result = this.result(entry);
     this.enqueue(entry.code, result.approvalUrl);
@@ -104,6 +106,23 @@ export class ApprovalCenter {
     const p = this.pending.get(requestId);
     const given = Buffer.from(typeof token === 'string' ? token : '', 'base64url');
     if (!p || given.length !== p.token.length || !timingSafeEqual(given, p.token)) throw new KakaoError('NOT_FOUND', 'No such pending approval');
+    return p;
+  }
+  /**
+   * What the access token alone shows. The token travels in the approval link, which the agent also gets, so stored
+   * message content the agent may not read stays redacted exactly as in the agent's own copy; `redacted` lists it.
+   */
+  view(p: PendingApproval): { envelope: Record<string, any>; redacted: string[] } {
+    const agent = redactApprovalForAgent({ signingText: p.signingText }) as { reviewText?: unknown; redacted?: unknown };
+    return typeof agent.reviewText === 'string' && Array.isArray(agent.redacted)
+      ? { envelope: JSON.parse(agent.reviewText), redacted: agent.redacted as string[] }
+      : { envelope: JSON.parse(p.signingText), redacted: [] };
+  }
+  revealChallenge(p: PendingApproval): Buffer { return approvalRevealChallenge(p.signingText, p.revealNonce); }
+  /** The exact envelope, only after a user-verified passkey assertion for this approval's reveal challenge. */
+  reveal(requestId: string, token: string | undefined, assertion: WebAuthnAssertion): PendingApproval {
+    const p = this.get(requestId, token);
+    this.deps.store.verifyPasskey(this.revealChallenge(p), assertion);
     return p;
   }
   /** Whether this pending send can also allow its room for later sends. */

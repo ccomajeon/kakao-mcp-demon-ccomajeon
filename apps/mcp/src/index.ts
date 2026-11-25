@@ -62,7 +62,7 @@ registerAgentPublicationTools(server, () => ready(agentPublicationService, 'Agen
 registerAgentMutationTools(server, () => ready(agentMutationService, 'Agent mutation service'));
 registerPermissionTools(server, { engine: operationEngine, grants: () => ready(grants, 'Permissions'), policy });
 registerNamedOperationTools(server, operationEngine);
-registerChatTools(server, kakao);
+registerChatTools(server, kakao, policy);
 registerFriendsTools(server, kakao);
 registerOptionalModules(server, optionalModules, operationEngine);
 registerMessageInboxTools(server, kakao);
@@ -90,13 +90,13 @@ async function main() {
   // Leaving a room (here, on another device, or found at login) ends its send permission too.
   kakao.onChatLeft(chatId => { if (recipients.revoke(chatId)) process.stderr.write('[mcp] left room: send permission withdrawn\n'); });
   const modeApproves = (action: string) => agentModeApproves(kakao.config.agentMode, action);
-  const friendAdds = new DailyActionLimit(agentJournal.db, { action: 'add_friend', limit: kakao.config.addFriendDailyLimit, timeZone: kakao.config.client.timeZone });
+  const friendAdds = new DailyActionLimit(agentJournal.db, { action: 'add_friend', limit: kakao.config.addFriendDailyLimit, timeZone: kakao.config.client.timeZone, setting: 'KAKAO_ADD_FRIEND_DAILY_LIMIT' });
   friendAddLimit = friendAdds;
   grants = grantViews(kakao, recipients);
   // Modern (2026-07-28) clients that support form elicitation can ask the person directly.
   // A one-time read dialog may also open the room for later reads, like "don't ask again" for sends.
   const roomReads = { allowRead: (chatId: string) => { kakao.setRoomAccess(chatId, { mode: 'immediate' }); } };
-  server.setClientApproval(kakao.config.approval.clientConfirm ? new ElicitationApprovals(approvals, Date.now, recipients, roomReads) : undefined);
+  server.setClientApproval(kakao.config.approval.clientConfirm ? new ElicitationApprovals(approvals, Date.now, recipients, roomReads, chatId => policy.withinCeiling(chatId)) : undefined);
   registry.list(); // fail fast on an unsafe or corrupt registry, before the account session opens
   agentSendService = new AgentSendService({ principal: 'local-mcp', journal: agentJournal, adapter: agentMessageAdapter(kakao), policy, approvals, approvalWindow, recipients, modeApproves });
   // After each reconnection, settle sends whose outcome was lost with the connection, from the rooms' own history.

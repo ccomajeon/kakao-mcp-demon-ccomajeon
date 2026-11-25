@@ -59,19 +59,46 @@ test('hostile content is wrapped as untrusted data and cannot clear the marker',
   assert.equal(Object.keys(wrapped)[0], 'untrusted');
 });
 
-test('the approval names the reviewed room by title, kind, member count and chatId, and marks the title as untrusted', () => {
+test('the approval names the reviewed room by server facts first and the quoted member-set title last', () => {
   const group = approvalMessage(envelope({ context: { room: { title: '가족방', type: 'MultiChat', memberCount: 12 } } }))!.split('\n');
-  const at = group.indexOf('대상 가족방 (그룹 · 12명, chatId 123456789)');
+  const at = group.indexOf('대상 그룹 · 12명 · chatId 123456789 · 이름 "가족방"(참여자가 정한 이름)');
   assert.ok(at > 0, group.join('\n'));
   assert.match(group[at + 1], /방 이름은 참여자가 정한 글자라 믿을 수 없습니다/);
   const direct = approvalMessage(envelope({ context: { room: { title: null, type: 'DirectChat', memberCount: null } } }))!.split('\n');
-  assert.ok(direct.includes('대상 (방 이름 모름) (1:1, chatId 123456789)'));
+  assert.ok(direct.includes('대상 1:1 · chatId 123456789 · 이름 모름'), direct.join('\n'));
   assert.equal(direct.some(line => line.startsWith('(방 이름은')), false, 'no member-set text, no warning');
   // A mutation names its destination room, not the stored source message's room.
   const emoticon = approvalMessage(JSON.stringify({ action: 'send_emoticon', accountId: '111111111', requestId: 'fixture-request',
     message: { chatId: '123456789', fromChatId: '555555555', fromLogId: '1' },
     context: { kind: 'message', target: { chatId: '555555555' }, room: { maxLogId: '1', memberCount: 3, title: '오픈 방', type: 'OM' } } }))!;
-  assert.ok(emoticon.split('\n').includes('대상 오픈 방 (오픈채팅 그룹 · 3명, chatId 123456789)'));
+  assert.ok(emoticon.split('\n').includes('대상 오픈채팅 그룹 · 3명 · chatId 123456789 · 이름 "오픈 방"(참여자가 정한 이름)'));
   // Without reviewed metadata the line keeps showing the exact ID.
   assert.ok(approvalMessage(envelope({ context: undefined }))!.split('\n').includes('대상 123456789'));
+});
+
+test('a room title cannot imitate the server-written facts or push them out of view', () => {
+  const line = (title: string) => approvalMessage(envelope({ context: { room: { title, type: 'MultiChat', memberCount: 12 } } }))!
+    .split('\n').find(l => l.startsWith('대상 '))!;
+  // A forged suffix stays inside the quoted name, after the real facts.
+  const forged = line('엄마 (1:1 · 2명, chatId 987654321)');
+  assert.ok(forged.startsWith('대상 그룹 · 12명 · chatId 123456789 · 이름 "엄마 (1:1 · 2명, chatId 987654321)"'), forged);
+  // A quote inside the title cannot close the name early.
+  assert.ok(line('가족" · chatId 987654321').includes('이름 "가족\\" · chatId 987654321"(참여자가 정한 이름)'));
+  // Blank fillers, wide spaces and tag characters are shown, and a long title is cut at 40 characters.
+  const fillers = 'ㅤ⠀　ᅟᅠﾠ \u{E0041}';
+  const padded = line(`가족${fillers}${'x'.repeat(200)}`);
+  for (const code of ['3164', '2800', '3000', '115F', '1160', 'FFA0', '00A0', 'E0041']) assert.ok(padded.includes(`⟦U+${code}⟧`), code);
+  assert.equal(/[ㅤ⠀　ᅟᅠﾠ ]|\u{E0041}/u.test(padded), false);
+  assert.ok(padded.endsWith('x…"(참여자가 정한 이름)'), padded);
+  assert.ok(!padded.includes('x'.repeat(40)));
+});
+
+test('a user-targeted operation names the friend, not only a numeric ID', () => {
+  const user = (friend: Record<string, unknown>) => approvalMessage(JSON.stringify({ action: 'create_direct_chat', accountId: '111111111', requestId: 'fixture-request',
+    request: { userId: '424242424242' }, context: { kind: 'user', userId: '424242424242', friend } }))!.split('\n');
+  const known = user({ known: true, nickname: '홍길동 (chatId 1)', type: 1 });
+  const at = known.indexOf('대상 친구 · userId 424242424242 · 이름 "홍길동 (chatId 1)"(상대가 정한 이름)');
+  assert.ok(at > 0, known.join('\n'));
+  assert.match(known[at + 1], /이름은 상대가 정할 수 있는 글자라 믿을 수 없습니다/);
+  assert.ok(user({ known: false, nickname: null, type: null }).includes('대상 친구 목록에 없음 · userId 424242424242'));
 });

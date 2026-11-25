@@ -39,6 +39,13 @@ const sha256 = (data: Buffer | string) => createHash('sha256').update(data).dige
 export function approvalChallenge(signingText: string): Buffer {
   return sha256(Buffer.concat([Buffer.from('kakao-approval-v1\0'), Buffer.from(signingText)]));
 }
+/**
+ * Challenge for revealing stored content on the approval page. A separate domain from approvalChallenge, so a reveal
+ * assertion can never approve anything; the per-request nonce keeps it to one pending approval.
+ */
+export function approvalRevealChallenge(signingText: string, nonce: Buffer): Buffer {
+  return sha256(Buffer.concat([Buffer.from('kakao-approval-reveal-v1\0'), nonce, Buffer.from('\0'), Buffer.from(signingText)]));
+}
 export function rpIdForOrigin(origin: string): string { return new URL(origin).hostname; }
 
 interface AuthData { rpIdHash: Buffer; flags: number; signCount: number; rest: Buffer }
@@ -230,6 +237,16 @@ export class ApprovalStore {
         .run(requestId, this.journal.digest({ approval: signingText }), approver.id, this.now());
     });
     this.events.emit('change', { requestId, state: 'approved' } satisfies ApprovalEvent);
+    return { approverId: approver.id };
+  }
+  /**
+   * Verify a user-verified passkey assertion for a purpose other than approval (revealing stored content on the
+   * approval page). Records nothing but the authenticator counter; never approves.
+   */
+  verifyPasskey(challenge: Buffer, assertion: WebAuthnAssertion): { approverId: string } {
+    const approver = typeof assertion?.credentialId === 'string' ? this.registry.get(assertion.credentialId) : undefined;
+    if (!approver) throw denied('Unregistered credential');
+    this.registry.updateSignCount(approver.id, verifyWebAuthnAssertion(approver, challenge, assertion));
     return { approverId: approver.id };
   }
   /** Refusal narrows authority, so it needs no user verification. */

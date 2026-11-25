@@ -12,6 +12,7 @@ import { KakaoDb } from './db.ts';
 import { MessageStore } from './message-store.ts';
 import { KakaoError } from './errors.ts';
 import { loadConfig } from './config.ts';
+import { DailyActionLimit } from './daily-action-limit.ts';
 
 
 import { SELF, BSON_LONG, CHAT, FakeLocoSession, phoneRead, readRecent, readSearch, readHistory, readWait, setup, isCode } from './kakao-session-fixture.test-helper.ts';
@@ -449,7 +450,7 @@ test('read receipts need separate confirmation and media tokens must belong to a
   await kakao.sendMessage(CHAT, 'fixture');
   await assert.rejects(kakao.downloadMedia(CHAT, { token: 'other-room-token', messageId: '9001' }), isCode('POLICY_DENIED'));
   await assert.rejects(kakao.downloadMedia(CHAT, { token: 'own-token' }), isCode('POLICY_DENIED'));
-  kakao.hideMessages(CHAT, ['9001']);
+  new MessageStore(KakaoDb.open({ dir: kakao.config.dataDir })).hideMessages(CHAT, ['9001']);
   await assert.rejects(kakao.downloadMedia(CHAT, { token: 'own-token', messageId: '9001' }), isCode('POLICY_DENIED'));
   await assert.rejects(kakao.getTrailer('own-token'), isCode('POLICY_DENIED'));
   assert.equal(fake.calls.filter(c => c.method === 'downloadMedia').length, 0);
@@ -526,7 +527,7 @@ test('human original media resolves tokens from visible stored messages while ag
   assert.equal((download.args[1] as any).maxBytes, 16 * 1024 * 1024);
   assert.equal(kakao.getRoomAccess(CHAT).rule.mode, 'deny');
   await assert.rejects(kakao.downloadMedia(CHAT, { token: 'fixture-stored-token', messageId: '9001' }), isCode('POLICY_DENIED'));
-  kakao.hideMessages(CHAT, ['9001']);
+  new MessageStore(KakaoDb.open({ dir: kakao.config.dataDir })).hideMessages(CHAT, ['9001']);
   await assert.rejects(kakao.getUserMedia(CHAT, '9001'), isCode('NOT_FOUND'));
 });
 
@@ -536,7 +537,7 @@ test('human live refresh is local, bounded, room scoped and propagates deletions
   fake.emit('message', { chatId: CHAT, authorId: '42', messageId: '9001', type: 1, text: 'fixture live', sendAt: 1, raw: {} });
   const calls = fake.calls.length;
   assert.deepEqual(kakao.getUserUpdates(CHAT, '0', []).messages.map(m => m.messageId), ['9001']);
-  kakao.hideMessages(CHAT, ['9001']);
+  new MessageStore(KakaoDb.open({ dir: kakao.config.dataDir })).hideMessages(CHAT, ['9001']);
   assert.deepEqual(kakao.getUserUpdates(CHAT, '9001', ['9001']).removedIds, ['9001']);
   assert.equal(fake.calls.length, calls);
   assert.equal(kakao.getRoomAccess(CHAT).rule.mode, 'deny');
@@ -1059,4 +1060,48 @@ test('findOwnMessage matches our own message by client message ID across history
   assert.deepEqual(await kakao.findOwnMessage(CHAT, 77, '8004', 1), { found: false, complete: false });
   fake.replies.chatLogs = [{ status: -500, messages: [], eof: true, raw: {} }];
   await assert.rejects(kakao.findOwnMessage(CHAT, 77, '8005'), { code: 'LOCO_STATUS' });
+});
+
+test('openDirectChat never guesses between friends a name matches', async t => {
+  const { kakao, fake, dir } = setup({}, [{ userId: '111111111', nickName: 'fixture 홍길동' }, { userId: '222222222', nickName: 'fixture 홍길동' }]);
+  t.after(() => { kakao.stop(); removeTestDir(dir); });
+  fake.connect();
+  const before = fake.calls.length;
+  const res = await kakao.openDirectChat('fixture 홍길동', { allowCreate: true });
+  assert.equal(res.chatId, null); assert.equal(res.ambiguous, true); assert.equal(res.friend, undefined);
+  assert.deepEqual(res.candidates!.map(f => f.userId).sort(), ['111111111', '222222222']);
+  assert.equal(fake.calls.length, before, 'no lookup or CREATE for an ambiguous name');
+});
+
+test('the agent hides only stored messages of a readable room, bounded per call and per day', async t => {
+  const { kakao, fake, dir } = setup();
+  t.after(() => { kakao.stop(); removeTestDir(dir); });
+  fake.connect();
+  fake.emit('message', { chatId: CHAT, authorId: '42', messageId: '9001', type: 1, text: 'fixture', sendAt: 1, raw: {} });
+  fake.emit('message', { chatId: CHAT, authorId: '42', messageId: '9002', type: 1, text: 'fixture', sendAt: 2, raw: {} });
+  for (const bad of [[], ['not-a-number'], ['9'.repeat(50_000)], [9001], Array.from({ length: 51 }, (_, i) => String(9001 + i))]) {
+    assert.throws(() => kakao.hideMessages(CHAT, bad), isCode('INVALID_ARGUMENT'));
+  }
+  // Unknown IDs are refused as a whole: nothing is hidden ahead of a message that has not arrived.
+  assert.throws(() => kakao.hideMessages(CHAT, ['9001', '9999']), isCode('NOT_FOUND'));
+  assert.throws(() => kakao.hideMessages('999999999', ['9001']), isCode('POLICY_DENIED'));
+  kakao.setRoomAccess(CHAT, { mode: 'deny' });
+  assert.throws(() => kakao.hideMessages(CHAT, ['9001']), isCode('POLICY_DENIED'));
+  kakao.setRoomAccess(CHAT, { mode: 'immediate', maxMessages: 100, callsPerHour: 3600 });
+  assert.deepEqual(kakao.hideMessages(CHAT, ['9001', '9001']), { hidden: ['9001'], alreadyHidden: [], notStored: [] });
+  // The daily cap counts newly hidden messages only.
+  new DailyActionLimit(KakaoDb.open({ dir: kakao.config.dataDir }), { action: 'self_delete_messages', limit: 200, timeZone: kakao.config.client.timeZone }).reserve(198);
+  assert.deepEqual(kakao.hideMessages(CHAT, ['9001']).alreadyHidden, ['9001']);
+  fake.emit('message', { chatId: CHAT, authorId: '42', messageId: '9003', type: 1, text: 'fixture', sendAt: 3, raw: {} });
+  assert.throws(() => kakao.hideMessages(CHAT, ['9002', '9003']), isCode('RATE_LIMITED'));
+  assert.deepEqual(kakao.hideMessages(CHAT, ['9002']).hidden, ['9002']);
+  assert.throws(() => kakao.hideMessages(CHAT, ['9003']), isCode('RATE_LIMITED'));
+});
+
+test('hiding is held to the operator room ceiling', async t => {
+  const { kakao, fake, dir } = setup({ KAKAO_ROOM_CEILING: '999999999' });
+  t.after(() => { kakao.stop(); removeTestDir(dir); });
+  fake.connect();
+  fake.emit('message', { chatId: CHAT, authorId: '42', messageId: '9001', type: 1, text: 'fixture', sendAt: 1, raw: {} });
+  assert.throws(() => kakao.hideMessages(CHAT, ['9001']), isCode('POLICY_DENIED'));
 });

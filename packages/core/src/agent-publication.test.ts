@@ -43,7 +43,7 @@ test('binary and forward operations bind payload, room, type, metadata and photo
   for (const [action, input, changes] of [
     ['send_media', media(), [{ ...media(), dataBase64: png(4) }, { ...media(), fileName: 'changed.png' }, { ...media(), type: 18 }]],
     ['send_photo_bundle', bundle(), [{ ...bundle(), photos: [png(3), png()] }]],
-    ['forward_message', forward(), [{ ...forward(), text: forward().text + ' ' }, { ...forward(), type: 2 }, { ...forward(), extra: '{"fixture":false}' }]]
+    ['forward_message', forward(), [{ ...forward(), text: forward().text + ' ' }, { ...forward(), extra: '{"fixture":false}' }]]
   ] as Array<[AgentPublicationAction, AgentPublicationInput, AgentPublicationInput[]]>) {
     const f = fixture(t), id = f.id(), prepared = f.service.prepare(action, id, input);
     assert.equal(prepared.approvalRequired, true); assert.equal(f.calls(), 0);
@@ -125,4 +125,9 @@ test('concurrent binary commits share one durable claim and preserve the in-flig
   assert.ok(f.held()?.buffers[0].some(v => v !== 0));
   release(); await pending;
   assert.equal(f.calls(), 1); assert.ok(f.held()?.buffers[0].every(v => v === 0));
+});
+
+test('forward_message forwards text only: media types are refused before anything is prepared', () => {
+  for (const type of [2, 3, 18, 20, 255]) assert.throws(() => normalizeAgentPublication('forward_message', { ...forward(), type }), { code: 'INVALID_ARGUMENT' });
+  assert.equal(normalizeAgentPublication('forward_message', { chatId: '123456789', text: 'fixture' }).descriptor.type, 1);
 });

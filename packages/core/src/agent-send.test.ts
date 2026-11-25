@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, PREPARE_PER_MINUTE, type AgentMessage, type AgentSendAdapter, type RoomReview } from './agent-send.ts';
+import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, redactApprovalForAgent, SETTLE_GRACE_MS, PREPARE_PER_MINUTE, type AgentMessage, type AgentSendAdapter, type RoomReview } from './agent-send.ts';
 import { LocoError } from '@kakao-mcp/protocol';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';
 import { SendPolicy } from './policy.ts';
@@ -391,4 +391,16 @@ test('purging keeps every row that had or may have had an effect, and a purged r
   assert.notEqual(again.signingText, first.signingText);
   await assert.rejects(f.service.send(id, f.message), { code: 'APPROVAL_REQUIRED' });
   assert.equal(f.calls(), 0);
+});
+
+test('the agent copy of an approval names the remote-authored strings it carries and keeps stored content redacted', () => {
+  const approval = (context: unknown) => ({ requestId: 'fixture', expiresAt: 1, signingText: JSON.stringify({ action: 'fixture', request: { userId: '424242' }, context }) });
+  const user = redactApprovalForAgent(approval({ kind: 'user', userId: '424242', friend: { known: true, nickname: 'fixture 친구', type: 1 } })) as Record<string, any>;
+  assert.deepEqual(user.untrustedFields, ['context.friend.nickname']); assert.equal(typeof user.signingText, 'string');
+  const message = redactApprovalForAgent(approval({ kind: 'message', target: { text: 'fixture stored', attachment: null }, room: { title: 'fixture 방', maxLogId: '1' }, sourceRoom: { title: 'fixture 원래 방', maxLogId: '1' } })) as Record<string, any>;
+  assert.equal(message.signingText, undefined); assert.deepEqual(message.redacted, ['context.target.text']);
+  assert.deepEqual(message.untrustedFields, ['context.room.title', 'context.sourceRoom.title']);
+  assert.equal(String(message.reviewText).includes('fixture stored'), false);
+  const plain = approval({ kind: 'pause', paused: true });
+  assert.equal(redactApprovalForAgent(plain), plain, 'nothing remote: unchanged');
 });
