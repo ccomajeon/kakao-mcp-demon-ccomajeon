@@ -24,7 +24,7 @@ export interface OgPreview {
   siteName?: string;
 }
 
-const MAX_BYTES = 512 * 1024; // only need the <head>; cap the download
+const MAX_BYTES = 256 * 1024; // only the first 64K characters of the <head> are parsed; cap the download
 const TIMEOUT_MS = 6000;
 const MAX_REDIRECTS = 3;
 
@@ -98,31 +98,118 @@ function decodeEntities(s: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)));
+    .replace(/&#(\d{1,7});/g, (whole, d) => (Number(d) <= 0x10ffff ? String.fromCodePoint(Number(d)) : whole));
 }
 
-/** Extract a single meta tag's content by property/name, order-independent on attributes. */
-function metaContent(html: string, key: string): string | undefined {
-  // matches <meta property="og:title" content="..."> and the reversed attribute order
-  const patterns = [
-    new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']*)["']`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${key}["']`, 'i')
-  ];
-  for (const re of patterns) {
-    const m = html.match(re);
-    if (m) return decodeEntities(m[1]).trim();
+// Received pages are untrusted input of up to MAX_BYTES. Parsing is a single linear pass over the
+// document head with bounded tags, so no page can stall the GUI process with backtracking.
+const HEAD_CHARS = 64 * 1024;
+const MAX_TAG_CHARS = 2048;
+
+/** Case-insensitive check that `s` has `word` (lowercase ASCII) at `at`. */
+function startsWithAt(s: string, at: number, word: string): boolean {
+  return s.length >= at + word.length && s.slice(at, at + word.length).toLowerCase() === word;
+}
+const isSpace = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f';
+/** The character after a tag name: the name ends there (so `<metadata>` is not `<meta>`). */
+const endsName = (ch: string | undefined) => ch === undefined || ch === '>' || ch === '/' || isSpace(ch);
+
+/** Read the attributes of a tag from `from` (just after its name) up to its closing '>', looking at
+ * no more than MAX_TAG_CHARS. Returns undefined for a tag that does not end within that bound. */
+function readTag(html: string, from: number): { attrs: Map<string, string>; end: number } | undefined {
+  const tag = html.slice(from, from + MAX_TAG_CHARS);
+  const attrs = new Map<string, string>();
+  let i = 0;
+  for (;;) {
+    while (i < tag.length && (isSpace(tag[i]) || tag[i] === '/')) i++;
+    if (i >= tag.length) return undefined;
+    if (tag[i] === '>') return { attrs, end: from + i + 1 };
+    const nameStart = i++; // a name is at least one character, even '='
+    while (i < tag.length && !isSpace(tag[i]) && tag[i] !== '/' && tag[i] !== '>' && tag[i] !== '=') i++;
+    const name = tag.slice(nameStart, i).toLowerCase();
+    while (i < tag.length && isSpace(tag[i])) i++;
+    let value = '';
+    if (tag[i] === '=') {
+      i++;
+      while (i < tag.length && isSpace(tag[i])) i++;
+      const quote = tag[i];
+      if (quote === '"' || quote === "'") {
+        const close = tag.indexOf(quote, i + 1);
+        if (close < 0) return undefined;
+        value = tag.slice(i + 1, close);
+        i = close + 1;
+      } else {
+        const valueStart = i;
+        while (i < tag.length && !isSpace(tag[i]) && tag[i] !== '>') i++;
+        value = tag.slice(valueStart, i);
+      }
+    }
+    if (!attrs.has(name)) attrs.set(name, value);
   }
-  return undefined;
+}
+
+/** The document head: up to `</head>` and never more than HEAD_CHARS. */
+function headOf(html: string): string {
+  const limited = html.slice(0, HEAD_CHARS);
+  for (let at = limited.indexOf('<'); at >= 0; at = limited.indexOf('<', at + 1)) {
+    if (startsWithAt(limited, at, '</head') && endsName(limited[at + 6])) return limited.slice(0, at);
+  }
+  return limited;
+}
+
+/** Collect `<meta>` contents by lowercase property/name (first one wins) and the first `<title>`. */
+function scanHead(head: string): { meta: Map<string, string>; title?: string } {
+  const meta = new Map<string, string>();
+  let title: string | undefined;
+  let at = head.indexOf('<');
+  while (at >= 0) {
+    let next = at + 1;
+    if (startsWithAt(head, at, '<!--')) {
+      const close = head.indexOf('-->', at + 4);
+      if (close < 0) break;
+      next = close + 3;
+    } else if (startsWithAt(head, at, '<meta') && endsName(head[at + 5])) {
+      const tag = readTag(head, at + 5);
+      next = tag ? tag.end : at + 5 + MAX_TAG_CHARS;
+      const content = tag?.attrs.get('content');
+      if (tag && content !== undefined) {
+        for (const key of [tag.attrs.get('property'), tag.attrs.get('name')]) {
+          const k = key?.trim().toLowerCase();
+          if (k && !meta.has(k)) meta.set(k, content);
+        }
+      }
+    } else if (startsWithAt(head, at, '<title') && endsName(head[at + 6])) {
+      const tag = readTag(head, at + 6);
+      next = tag ? tag.end : at + 6 + MAX_TAG_CHARS;
+      if (tag && title === undefined) {
+        // Title text is plain text up to its end tag; an unterminated title is ignored.
+        for (let close = head.indexOf('<', tag.end); close >= 0; close = head.indexOf('<', close + 1)) {
+          if (startsWithAt(head, close, '</title') && endsName(head[close + 7])) {
+            title = head.slice(tag.end, close);
+            next = close + 7;
+            break;
+          }
+        }
+        if (title === undefined) break;
+      }
+    }
+    at = head.indexOf('<', next);
+  }
+  return { meta, title };
 }
 
 export function parseOg(html: string, url: string): OgPreview {
-  const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const { meta, title } = scanHead(headOf(html));
+  const metaContent = (key: string) => {
+    const value = meta.get(key);
+    return value === undefined ? undefined : decodeEntities(value).trim();
+  };
   const preview: OgPreview = {
     url,
-    title: metaContent(html, 'og:title') || (titleTag ? decodeEntities(titleTag[1]).trim() : undefined),
-    description: metaContent(html, 'og:description') || metaContent(html, 'description'),
-    image: metaContent(html, 'og:image'),
-    siteName: metaContent(html, 'og:site_name')
+    title: metaContent('og:title') || (title !== undefined ? decodeEntities(title).trim() : undefined),
+    description: metaContent('og:description') || metaContent('description'),
+    image: metaContent('og:image'),
+    siteName: metaContent('og:site_name')
   };
   // Resolve a relative og:image against the page URL.
   if (preview.image && !/^https?:\/\//i.test(preview.image)) {

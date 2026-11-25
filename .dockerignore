@@ -1,6 +1,15 @@
-.git
+# Allowlist: only what the image needs is sent to the Docker build.
+*
+!package.json
+!package-lock.json
+!apps
+!packages
+!docker/bin
+
+# Never send these, even from inside the folders allowed above.
 **/node_modules
 **/dist
+**/*.tsbuildinfo
 **/.env
 **/.env.*
 **/*.pem
@@ -29,8 +38,4 @@
 **/approver-enroll.json*
 **/auth-relogin.json*
 **/install-state.json*
-rea
-research
-docs
-build
-.DS_Store
+**/.DS_Store

@@ -37,6 +37,42 @@ test('parseOg handles reversed attribute order (content before property)', () =>
   assert.equal(og.title, 'Reversed');
 });
 
+test('parseOg reads attributes in any quoting and ignores comments, lookalike tags and the body', () => {
+  const html = `<HEAD><!-- <meta property="og:title" content="commented"> -->
+    <metadata property="og:title" content="not meta">
+    <META NAME=description CONTENT='a > b &#99999999; &#65;'>
+    <meta property="OG:TITLE" content="Upper">
+    <meta property="og:title" content="second">
+    <title data-x="1">Title</title></head><body><meta property="og:site_name" content="from body"></body>`;
+  const og = parseOg(html, 'https://example.com/');
+  assert.equal(og.title, 'Upper');
+  assert.equal(og.description, 'a > b &#99999999; A');
+  assert.equal(og.siteName, undefined);
+});
+
+test('parseOg stays linear on pathological pages (no backtracking stall)', () => {
+  const size = 512 * 1024;
+  const fill = (unit: string) => unit.repeat(Math.ceil(size / unit.length)).slice(0, size);
+  const pages = {
+    'repeated meta openings': fill('<meta '),
+    'meta without content or end': fill('<meta property="og:title" '),
+    'meta with an unclosed quote': '<meta content="' + fill('a'),
+    'attribute soup': '<meta ' + fill('a=b '),
+    'repeated title openings': fill('<title>'),
+    'unterminated title': '<title>' + fill('x<'),
+    'lone angle brackets': fill('<'),
+    'unterminated comments': fill('<!--'),
+    'many small metas': fill('<meta name=a content=b>'),
+    'long head before og tags': fill(' ') + '<meta property="og:title" content="late">'
+  };
+  for (const [name, html] of Object.entries(pages)) {
+    const started = performance.now();
+    parseOg(html, 'https://example.com/');
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 100, `${name}: ${elapsed.toFixed(1)} ms`);
+  }
+});
+
 test('only public addresses count as public', () => {
   for (const ip of ['93.184.216.34', '1.1.1.1', '2606:4700:4700::1111']) assert.equal(isPublicAddress(ip), true, ip);
   for (const ip of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.0.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '224.0.0.1',

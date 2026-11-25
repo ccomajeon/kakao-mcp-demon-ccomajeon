@@ -36,5 +36,19 @@ test('the generated address is still blocked in commit bodies and source trees',
 });
 test('maintainer patterns still inspect generated committer metadata', t => {
   const blocked = scan(t, { deny: 'GitHub' });
-  assert.equal(blocked.status, 1); assert.match(blocked.stderr, /committer: private term/);
+  assert.equal(blocked.status, 1); assert.match(blocked.stderr, /1 match\(es\) of the maintainer deny list/);
+});
+test('maintainer matches report only a count, never which term or where', t => {
+  const deny = 'fixture-unused\nfixture-secret-word';
+  for (const options of [{ deny, body: 'fixture-secret-word in a message' }, { deny, content: 'x fixture-secret-word\n', tree: true }]) {
+    const result = scan(t, options);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /1 match\(es\) of the maintainer deny list/);
+    assert.doesNotMatch(result.stderr, /#\d|fixture-secret-word|fixture\.txt|message:|commit [0-9a-f]{7}/);
+  }
+  // Public patterns keep their location so contributors can fix them.
+  const both = scan(t, { deny, content: `fixture-secret-word ${privateEmail}\n`, tree: true });
+  assert.equal(both.status, 1);
+  assert.match(both.stderr, /fixture\.txt:1: email address/);
+  assert.match(both.stderr, /1 match\(es\) of the maintainer deny list/);
 });
