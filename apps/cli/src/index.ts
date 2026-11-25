@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadConfig, toKakaoError, programArgs, installRoot, packagedEntry } from '@kakao-mcp/core';
-import { resolveRoom } from './room-resolution.ts';
+import { isMemoChat, resolveRoom } from './room-resolution.ts';
 import { randomUUID } from 'node:crypto';
 import { sendMessage, sendPhotos, submitWrite, approvalLink } from './agent-send-client.ts';
 import { runAgentFileCommand, readAgentRequest } from './agent-send-files.ts';
@@ -175,7 +175,7 @@ async function cmdList() {
     const unread = chat.unreadCount && chat.unreadCount > 0
       ? `${c.red}${c.bold}${String(chat.unreadCount).padStart(3)}${c.reset}   `
       : `${c.gray}  -   ${c.reset}`;
-    const isMemo = chat.title === '나와의 채팅' || chat.type === 'MemoChat';
+    const isMemo = isMemoChat(chat);
     const isDirect = isDirectChat(chat);
     const typeLabel = isMemo
       ? `${c.magenta}나  ${c.reset}`

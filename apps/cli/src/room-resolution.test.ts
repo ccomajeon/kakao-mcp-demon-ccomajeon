@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRoom } from './room-resolution.ts';
+import { isMemoChat, resolveRoom } from './room-resolution.ts';
 
 test('room names never silently choose the first duplicate or substring match', () => {
   const rooms = [{ id: '123456789', title: 'fixture team', type: 'DirectChat' }, { id: '987654321', title: 'fixture team', type: 'MultiChat' }];
@@ -22,4 +22,10 @@ test('canonical IDs take precedence over indexes and preserve integers beyond JS
   assert.equal(resolveRoom(rooms, '1')?.id, '1');
   assert.equal(resolveRoom(rooms, '#1')?.id, '2');
   assert.equal(resolveRoom(rooms, '9007199254740993')?.id, '9007199254740993');
+});
+
+test('a room is a memo room by its type only, never by a title that imitates it', () => {
+  assert.equal(isMemoChat({ title: '나와의 채팅', type: 'DirectChat' }), false);
+  assert.equal(isMemoChat({ title: '나와의 채팅', type: 'MultiChat' }), false);
+  assert.equal(isMemoChat({ title: 'fixture memo', type: 'MemoChat' }), true);
 });

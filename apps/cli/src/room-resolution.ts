@@ -1,5 +1,10 @@
 import { KakaoError } from '@kakao-mcp/core';
 
+/** A memo (self) room is identified by its type only; a title is untrusted and can imitate it. */
+export function isMemoChat(chat: { type?: string; title?: string }): boolean {
+  return chat.type === 'MemoChat';
+}
+
 /** Resolve only already-known rooms. Lookup never creates a room or contacts a server. */
 export function resolveRoom<T extends { id: string; type?: string; title?: string }>(chats: T[], query: string): T | undefined {
   const q = query.trim().toLowerCase();
@@ -10,7 +15,7 @@ export function resolveRoom<T extends { id: string; type?: string; title?: strin
     if (matches.length > 1) throw new KakaoError('INVALID_ARGUMENT', 'Ambiguous room; use its exact canonical ID');
     return matches[0];
   };
-  if (['self','me','나','나와의채팅'].includes(q)) return unique(chats.filter(c => c.type === 'MemoChat'));
+  if (['self','me','나','나와의채팅'].includes(q)) return unique(chats.filter(isMemoChat));
   if (/^#?[1-9]\d*$/.test(q)) {
     const index = Number(q.replace(/^#/, ''));
     return Number.isSafeInteger(index) ? chats[index - 1] : undefined;
