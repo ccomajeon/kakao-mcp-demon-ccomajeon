@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SendPolicy, loadPolicyConfig, type PolicyConfig } from './policy.ts';
+import { SendPolicy, loadPolicyConfig, metaPauseStore, type PolicyConfig } from './policy.ts';
+import { KakaoDb } from './db.ts';
 
 const NOTIFY = '111111111', FRIEND = '222222222', STRANGER = '333333333';
 const A = '444444444', B = '555555555', C = '666666666';
@@ -199,4 +200,49 @@ test('loadPolicyConfig reads the rate limit env, with defaults when unset', () =
   assert.deepEqual(cfg.rateLimit, { windowMs: 30_000, perChat: 0, global: 7 });
   // garbage falls back to the default
   assert.equal(loadPolicyConfig({ envPath, env: { KAKAO_RATE_GLOBAL: 'lots' } }).rateLimit!.global, 15);
+});
+
+test('a pause survives a restart; only a released pause is saved as released, and a failed save never releases it', t => {
+  const dir = tmpDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const auditLogPath = path.join(dir, 'audit.log');
+  const start = (pausedAtStart = false) => {
+    const db = KakaoDb.open({ dir, importLegacy: false });
+    const policy = new SendPolicy({ notifyChatId: NOTIFY, ceiling: [FRIEND], auditLogPath, pausedAtStart });
+    policy.usePauseStore(metaPauseStore(db));
+    return { db, policy };
+  };
+  let run = start();
+  assert.equal(run.policy.isPaused(), false, 'nothing saved yet');
+  run.policy.setPaused(true);
+  run.db.close();
+
+  run = start();
+  assert.equal(run.policy.isPaused(), true, 'a restart keeps the pause');
+  assert.equal(run.policy.decide(FRIEND).allowed, false);
+  run.policy.setPaused(false); // the approved release
+  run.db.close();
+
+  run = start();
+  assert.equal(run.policy.isPaused(), false);
+  run.db.close();
+  run = start(true);
+  assert.equal(run.policy.isPaused(), true, 'KAKAO_PAUSED still pauses at start');
+  run.db.close();
+
+  // An unreadable saved value fails closed.
+  const corrupt = KakaoDb.open({ dir, importLegacy: false });
+  corrupt.setMeta('policy-pause', 'fixture-unknown');
+  const restored = new SendPolicy({ ceiling: [], auditLogPath, pausedAtStart: false });
+  restored.usePauseStore(metaPauseStore(corrupt));
+  assert.equal(restored.isPaused(), true);
+  corrupt.close();
+
+  // Saving fails: pausing still applies at once (and says it was not saved); releasing does not happen.
+  const broken = new SendPolicy({ ceiling: [], auditLogPath, pausedAtStart: false });
+  broken.usePauseStore({ load: () => undefined, save: () => { throw new Error('disk full'); } });
+  assert.throws(() => broken.setPaused(true), { code: 'INTERNAL' });
+  assert.equal(broken.isPaused(), true);
+  assert.throws(() => broken.setPaused(false), { code: 'INTERNAL' });
+  assert.equal(broken.isPaused(), true);
 });

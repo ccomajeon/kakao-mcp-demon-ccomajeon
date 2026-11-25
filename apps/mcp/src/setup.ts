@@ -187,7 +187,7 @@ if (isMainModule(import.meta.url, 'setup')) {
       if (!target.managed) return;
       // The daemon reads the mode at start. A pause set while it runs does not survive a restart.
       let restart = false;
-      try { restart = await confirmSetup(terminalPrompt, '지금 서비스를 다시 시작해 적용할까요? 실행 중에 건 일시정지는 풀립니다.', true); } catch { /* no terminal */ }
+      try { restart = await confirmSetup(terminalPrompt, '지금 서비스를 다시 시작해 적용할까요? 걸어 둔 일시정지는 재시작 뒤에도 유지됩니다.', true); } catch { /* no terminal */ }
       if (!restart) { process.stderr.write('적용하려면: sudo systemctl restart kakao-mcp\n'); return; }
       const restarted = spawnSync('systemctl', ['restart', 'kakao-mcp'], { stdio: 'inherit' });
       if (restarted.status !== 0) throw new KakaoError('CONFIG_INVALID', 'The mode was saved but the service did not restart; run sudo systemctl restart kakao-mcp');

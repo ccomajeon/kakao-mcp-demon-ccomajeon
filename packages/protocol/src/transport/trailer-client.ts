@@ -3,6 +3,7 @@ import { BSON } from 'bson';
 import { createLocoV2Handshake, encryptLocoV2Frame, decryptLocoV2Frame } from '../crypto/loco-crypto.js';
 import { encodeLocoPacket, decodeLocoPacket } from '../framing/loco-packet.js';
 import { LocoError } from '../errors/loco-error.js';
+import { ByteQueue, MAX_LOCO_FRAME_BYTES, checkLocoFrameLength } from './loco-stream.js';
 
 export interface TrailerUploadOptions {
   host: string;
@@ -136,7 +137,10 @@ export async function downloadMediaFromTrailer(opts: TrailerDownloadOptions): Pr
       const encryptedReq = encryptLocoV2Frame(reqPacket, aesKey);
       socket.write(Buffer.concat([Buffer.from(handshakeBytes), Buffer.from(encryptedReq)]));
 
-      let incoming = Buffer.alloc(0);
+      const incoming = new ByteQueue();
+      // Media chunks arrive as many small frames; never buffer a frame larger than the download
+      // limit (plus framing slack) or, for an unbounded streamed download, the protocol frame limit.
+      const frameLimit = Math.min(opts.maxBytes ?? Infinity, MAX_LOCO_FRAME_BYTES) + 65536;
       let headerAcked = false;
       let expectedSize = 0;
       let receivedBytes = 0;
@@ -179,14 +183,15 @@ export async function downloadMediaFromTrailer(opts: TrailerDownloadOptions): Pr
         if (draining || settled) return;
         draining = true;
         try {
-          while (!settled && incoming.length >= 4) {
-            const frameLen = incoming.readUInt32LE(0);
-            if (opts.maxBytes !== undefined && frameLen > opts.maxBytes + 65536) {
-              throw new LocoError('MALFORMED', 'Trailer frame exceeds download limit');
-            }
-            if (incoming.length < 4 + frameLen) break;
-            const framePayload = incoming.subarray(4, 4 + frameLen);
-            incoming = incoming.subarray(4 + frameLen);
+          while (!settled) {
+            const prefix = incoming.peek(4);
+            if (!prefix) break;
+            const frameLen = prefix.readUInt32LE(0);
+            if (frameLen > frameLimit) throw new LocoError('MALFORMED', 'Trailer frame exceeds download limit');
+            checkLocoFrameLength(frameLen, frameLimit);
+            const frame = incoming.take(4 + frameLen);
+            if (!frame) break;
+            const framePayload = frame.subarray(4);
             socket.pause();
             try {
               if (await handleFrame(framePayload)) return;
@@ -202,8 +207,9 @@ export async function downloadMediaFromTrailer(opts: TrailerDownloadOptions): Pr
       };
 
       socket.on('data', (chunk) => {
+        if (settled) return;
         touch();
-        incoming = incoming.length === 0 ? Buffer.from(chunk) : Buffer.concat([incoming, chunk]);
+        incoming.push(chunk);
         void drain();
       });
     });
@@ -228,11 +234,23 @@ export async function uploadMediaToTrailer(opts: TrailerUploadOptions): Promise<
 
   return new Promise((resolve, reject) => {
     let timer: NodeJS.Timeout | undefined;
+    let settled = false;
+    const fail = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      reject(err);
+    };
+    const succeed = (result: TrailerUploadResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.end();
+      resolve(result);
+    };
     const socket = net.connect({ host: opts.host, port: opts.port }, () => {
-      timer = setTimeout(() => {
-        socket.destroy();
-        reject(new LocoError('TIMEOUT', `Trailer upload timed out after ${timeoutMs}ms`, { command: 'POST' }));
-      }, timeoutMs);
+      timer = setTimeout(() => fail(new LocoError('TIMEOUT', `Trailer upload timed out after ${timeoutMs}ms`, { command: 'POST' })), timeoutMs);
 
       const { handshakeBytes, aesKey } = createLocoV2Handshake(opts.rsaPublicKeyPem);
 
@@ -262,20 +280,22 @@ export async function uploadMediaToTrailer(opts: TrailerUploadOptions): Promise<
 
       socket.write(Buffer.concat([Buffer.from(handshakeBytes), Buffer.from(encryptedPost)]));
 
-      let incoming = Buffer.alloc(0);
+      const incoming = new ByteQueue();
       let postAcked = false;
 
       socket.on('data', (chunk) => {
-        incoming = Buffer.concat([incoming, chunk]);
+        if (settled) return;
+        incoming.push(chunk);
 
-        while (incoming.length >= 4) {
-          const frameLen = incoming.readUInt32LE(0);
-          if (incoming.length < 4 + frameLen) break;
-
-          const framePayload = incoming.subarray(4, 4 + frameLen);
-          incoming = incoming.subarray(4 + frameLen);
-
+        while (!settled) {
           try {
+            const prefix = incoming.peek(4);
+            if (!prefix) break;
+            const frameLen = prefix.readUInt32LE(0);
+            checkLocoFrameLength(frameLen);
+            const frame = incoming.take(4 + frameLen);
+            if (!frame) break;
+            const framePayload = frame.subarray(4);
             const decrypted = decryptLocoV2Frame(framePayload, aesKey);
             const decoded = decodeLocoPacket(decrypted);
             const method = decoded.header.method.trim();
@@ -283,9 +303,7 @@ export async function uploadMediaToTrailer(opts: TrailerUploadOptions): Promise<
             if (method === 'POST' && !postAcked) {
               postAcked = true;
               if (decoded.header.status !== 0) {
-                socket.destroy();
-                clearTimeout(timer);
-                return reject(new LocoError('STATUS', `Trailer POST rejected with status ${decoded.header.status}`, { command: 'POST', status: decoded.header.status }));
+                return fail(new LocoError('STATUS', `Trailer POST rejected with status ${decoded.header.status}`, { command: 'POST', status: decoded.header.status }));
               }
 
               const offset = Number(decoded.data.o ?? decoded.data.offset ?? 0);
@@ -299,15 +317,12 @@ export async function uploadMediaToTrailer(opts: TrailerUploadOptions): Promise<
                 curr = next;
               }
             } else if (method === 'COMPLETE') {
-              clearTimeout(timer);
-              socket.end();
-
               if (decoded.header.status !== 0) {
-                return reject(new LocoError('STATUS', `Trailer COMPLETE returned status ${decoded.header.status}`, { command: 'COMPLETE', status: decoded.header.status }));
+                return fail(new LocoError('STATUS', `Trailer COMPLETE returned status ${decoded.header.status}`, { command: 'COMPLETE', status: decoded.header.status }));
               }
 
               const chatLog = (decoded.data.chatLog || {}) as Record<string, any>;
-              return resolve({
+              return succeed({
                 status: Number(decoded.data.status ?? decoded.header.status ?? 0),
                 chatLog: {
                   ...chatLog,
@@ -322,21 +337,15 @@ export async function uploadMediaToTrailer(opts: TrailerUploadOptions): Promise<
               });
             }
           } catch (err) {
-            clearTimeout(timer);
-            socket.destroy();
-            return reject(err);
+            return fail(err);
           }
         }
       });
     });
 
-    socket.on('error', (err) => {
-      if (timer) clearTimeout(timer);
-      reject(err);
-    });
-
-    socket.on('close', () => {
-      if (timer) clearTimeout(timer);
-    });
+    socket.on('error', (err) => fail(err));
+    // A close before COMPLETE must settle the upload (it used to wait forever). CLOSED keeps the
+    // outcome uncertain for the caller: the bytes may already have been committed.
+    socket.on('close', () => fail(new LocoError('CLOSED', 'Trailer upload closed before completion', { command: 'POST' })));
   });
 }

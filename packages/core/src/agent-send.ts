@@ -143,7 +143,23 @@ export interface AgentOperationRow extends Record<string, import('node:sqlite').
 }
 export interface AgentSendResult { status: 0; logId: string; requestId: string; state: 'sent_unverified'; category: SendCategory; }
 const POLICY_VERSION = 'agent-message-v1';
-const MAX_ROWS = 10000; // Never evict an old request ID and silently enable replay.
+const MAX_ROWS = 10000; // Never evict a request ID whose replay could repeat an effect (see purgeDead).
+/**
+ * New operations the journal accepts per minute. Preparing needs no approval, so without a bound a looping or
+ * misled agent could fill the journal in seconds. Rows that never had an effect are purged once they are
+ * PURGE_AFTER_MS past their deadline (approval window of at most 30 minutes + commit window + margin), so at
+ * most PREPARE_PER_MINUTE * (30 + 5 + 60) = 2,850 of them are alive at a time, far below MAX_ROWS.
+ */
+export const PREPARE_PER_MINUTE = 30;
+const PURGE_MARGIN_MS = 60 * 60_000;
+/**
+ * Rows that never had (and can no longer have) an external effect: never claimed for sending, no recorded send
+ * attempt, no room-permission use, in a state that cannot commit (an old `prepared` row is refused as expired).
+ * `approved` and every sending, uncertain or done state are never purged.
+ */
+const DEAD_ROWS = `state IN ('prepared','expired','stale','rejected') AND attempted_at IS NULL AND expires_at <= ?
+  AND NOT EXISTS (SELECT 1 FROM recipient_permission_uses u WHERE u.request_id = agent_send_operations.request_id)
+  AND NOT EXISTS (SELECT 1 FROM meta m WHERE m.key = 'send-attempt:' || agent_send_operations.request_id)`;
 
 export function canonicalAgentJson(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
@@ -231,9 +247,15 @@ export class AgentSendJournal {
   digest(value: unknown): string { return createHmac('sha256', this.key).update(canonicalAgentJson(value)).digest('hex'); }
   get(id: string): Row | undefined { return journalIO(() => this.db.db.prepare('SELECT * FROM agent_send_operations WHERE request_id = ?').get(id) as Row | undefined); }
   prepare(row: Row): Row {
+    if (!this.get(row.request_id)) this.purgeDead(row.created_at);
     return journalIO(() => this.db.transaction(() => {
       const previous = this.get(row.request_id);
       if (previous) return previous;
+      const now = row.created_at;
+      const recent = this.db.db.prepare('SELECT COUNT(*) AS n FROM agent_send_operations WHERE created_at > ?').get(now - 60_000) as { n: number };
+      if (recent.n >= PREPARE_PER_MINUTE) {
+        throw new KakaoError('RATE_LIMITED', 'Too many new operations in the last minute; wait before preparing another, and do not retry in a loop', { retryable: true });
+      }
       const count = this.db.db.prepare('SELECT COUNT(*) AS n FROM agent_send_operations').get() as { n: number };
       if (count.n >= MAX_ROWS) throw new KakaoError('POLICY_DENIED', 'Agent journal capacity reached; operator maintenance required');
       this.db.db.prepare(`INSERT INTO agent_send_operations
@@ -241,6 +263,25 @@ export class AgentSendJournal {
         VALUES (?,?,?,?,?,?,?,?,?)`).run(row.request_id,row.payload_digest,row.room_digest,row.context_digest,row.policy_digest,row.created_at,row.expires_at,row.state,row.category);
       return row;
     }));
+  }
+  /**
+   * Remove rows that never had an external effect once their approval and commit windows are long over.
+   * Safe for idempotency: such a request ID was never sent or applied, so preparing it again cannot repeat an
+   * effect, and it cannot reuse an old approval: the new row gets new created/expires times, so its review
+   * envelope differs and needs a fresh human approval (the stale approval record is removed with the row).
+   * Rows that were sent, applied, are in flight or have an unknown outcome are kept forever.
+   */
+  purgeDead(now: number): number {
+    return journalIO(() => this.db.transaction(() => {
+      const cutoff = now - COMMIT_WINDOW_MS - PURGE_MARGIN_MS;
+      this.db.db.prepare(`DELETE FROM agent_approvals WHERE request_id IN (SELECT request_id FROM agent_send_operations WHERE ${DEAD_ROWS})`).run(cutoff);
+      return Number(this.db.db.prepare(`DELETE FROM agent_send_operations WHERE ${DEAD_ROWS}`).run(cutoff).changes);
+    }));
+  }
+  /** Content-free journal usage: rows kept and the capacity. */
+  usage(): { rows: number; capacity: number } {
+    const n = journalIO(() => (this.db.db.prepare('SELECT COUNT(*) AS n FROM agent_send_operations').get() as { n: number }).n);
+    return { rows: n, capacity: MAX_ROWS };
   }
   claim(id: string, rate: RateLimitConfig, now: number): boolean {
     return journalIO(() => this.db.transaction(() => {

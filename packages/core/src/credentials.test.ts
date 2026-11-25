@@ -87,3 +87,34 @@ test('human login configuration deduplicates managed keys while preserving devic
   assert.match(saved, /KAKAO_AUTH_RELOGIN_MAX_ATTEMPTS=1/);
   assert.match(saved, /KAKAO_REGISTERED_DEVICE_UUID=device/);
 });
+
+test('a credential rewrite that fails part-way never leaves the settings file empty or unreadable', (t) => {
+  const original = 'KAKAO_USER_ID=123\n# operator settings\nKAKAO_ACCESS_TOKEN=old-token\nKAKAO_REGISTERED_DEVICE_UUID=dev\nKAKAO_AGENT_MODE=ask\nKAKAO_ROOM_CEILING=456\n';
+  const p = tmpEnv(original);
+  t.after(() => fs.rmSync(path.dirname(p), { recursive: true, force: true }));
+  const store = CredentialStore.load({ envPath: p, env: {} });
+  const inode = fs.statSync(p).ino;
+
+  // Disk full / file size limit: no write succeeds. Growing and shrinking both keep the original file.
+  const failing = t.mock.method(fs, 'writeSync', () => { throw Object.assign(new Error('fixture: no space left'), { code: 'ENOSPC' }); });
+  for (const accessToken of ['a-much-longer-replacement-token-than-before', 'n']) {
+    assert.throws(() => store.update({ accessToken }), /Cannot persist account credentials/);
+    assert.equal(fs.readFileSync(p, 'utf-8'), original);
+  }
+  failing.mock.restore();
+
+  // A crash after the new contents are written but before the final cut leaves the new settings plus blank lines.
+  const cut = t.mock.method(fs, 'ftruncateSync', () => { throw new Error('fixture: interrupted'); });
+  assert.throws(() => store.update({ accessToken: 'n' }));
+  cut.mock.restore();
+  const interrupted = CredentialStore.load({ envPath: p, env: {} }).get();
+  assert.equal(interrupted.accessToken, 'n');
+  assert.equal(interrupted.deviceUUID, 'dev');
+  assert.match(fs.readFileSync(p, 'utf-8'), /^KAKAO_AGENT_MODE=ask$/m);
+
+  // A normal rewrite keeps the inode and leaves exactly the new contents.
+  store.update({ accessToken: 'newer' });
+  assert.equal(fs.statSync(p).ino, inode);
+  assert.equal(fs.readFileSync(p, 'utf-8'), original.replace('old-token', 'newer'));
+  assert.equal(fs.statSync(p).mode & 0o777, 0o600);
+});

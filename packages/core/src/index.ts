@@ -2,7 +2,7 @@
 // Core owns the sole account session, stores, human approvals and shared write lifecycle.
 export { KakaoSession } from './kakao-session.ts';
 export type { LeftReason } from './kakao-session.ts';
-export { SendPolicy, loadPolicyConfig, type PolicyDecision } from './policy.ts';
+export { SendPolicy, loadPolicyConfig, metaPauseStore, type PolicyDecision, type PauseStore } from './policy.ts';
 export { CredentialStore, writeEnvKeys } from './credentials.ts';
 export { findEnvFile, readEnvFile } from './env-file.ts';
 export { KakaoDb } from './db.ts';

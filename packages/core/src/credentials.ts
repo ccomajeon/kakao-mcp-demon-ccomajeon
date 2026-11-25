@@ -59,16 +59,36 @@ export function writeEnvKeys(envPath: string, kv: Record<string, string | undefi
   }).filter((line): line is string => line !== null);
   for (const [key, v] of remaining) next.push(`${key}=${v}`);
   try {
-    const body = next.join('\n').replace(/\n+$/, '') + '\n';
+    const body = Buffer.from(next.join('\n').replace(/\n+$/, '') + '\n', 'utf-8');
     // The managed service may write only this file, not its root-owned parent.
     // Keep the inode and ownership; create no secret-bearing temporary copies.
     const fd = fs.openSync(envPath, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
     try {
-      if (!fs.fstatSync(fd).isFile()) throw new Error('unsafe');
-      fs.fchmodSync(fd, 0o600); fs.ftruncateSync(fd, 0);
-      fs.writeFileSync(fd, body); fs.fsyncSync(fd);
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile()) throw new Error('unsafe');
+      fs.fchmodSync(fd, 0o600);
+      rewriteInPlace(fd, stat.size, body);
+      fs.fsyncSync(fd);
     } finally { fs.closeSync(fd); }
   } catch { throw new KakaoError('STORAGE_UNSAFE', 'Cannot persist account credentials'); }
+}
+
+function writeAllAt(fd: number, bytes: Buffer, position: number): void {
+  for (let done = 0; done < bytes.length;) done += fs.writeSync(fd, bytes, done, bytes.length - done, position + done);
+}
+
+/**
+ * Replace the file's contents without ever truncating it first: a failed write (disk full, file size limit) or a
+ * crash part-way must not wipe the device key, tokens and operator settings. Every intermediate state is a
+ * readable settings file:
+ * 1. growing: reserve the extra length with blank lines first (if that fails, the old contents are untouched);
+ * 2. overwrite from offset 0, padding a shorter body with blank lines up to the old length;
+ * 3. only then cut the file to the new length.
+ */
+function rewriteInPlace(fd: number, oldSize: number, body: Buffer): void {
+  if (body.length > oldSize) writeAllAt(fd, Buffer.alloc(body.length - oldSize, 0x0a), oldSize);
+  writeAllAt(fd, body.length < oldSize ? Buffer.concat([body, Buffer.alloc(oldSize - body.length, 0x0a)]) : body, 0);
+  fs.ftruncateSync(fd, body.length);
 }
 
 export class CredentialStore {
