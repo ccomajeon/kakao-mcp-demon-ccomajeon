@@ -70,3 +70,35 @@ test('the page never interpolates URLs into style attributes, never loads previe
   const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /\son\w+="/i); assert.doesNotMatch(html, /<script(?![^>]*\ssrc=)/i, 'no inline script');
 });
+
+test('opening a room never fetches a received link; the preview loads only on click', async () => {
+  const code = [
+    source.match(/^const esc = .*$/m)![0],
+    between('const URL_RE = ', 'function renderBubbleContent(')
+  ].join('\n');
+  const calls: string[] = [];
+  const element = () => {
+    const el: any = { listeners: {} as Record<string, () => void>, children: [] as unknown[], disabled: false, textContent: '',
+      addEventListener(type: string, fn: () => void) { el.listeners[type] = fn; },
+      replaceWith(other: unknown) { el.replacedBy = other; } };
+    return el;
+  };
+  const wrap: any = { appended: [] as any[], querySelector: () => null, appendChild(child: unknown) { wrap.appended.push(child); } };
+  const row = { dataset: { msgId: '1' }, querySelector: () => wrap };
+  const context = vm.createContext({
+    URL, encodeURIComponent, document: { createElement: element },
+    api: async (path: string) => { calls.push(path); return { url: 'https://site.example/a', title: 'Fixture <b>title</b>' }; }
+  });
+  vm.runInContext(code + '\nglobalThis.maybeRenderLinkPreview = maybeRenderLinkPreview;', context);
+  context.maybeRenderLinkPreview(row, { type: 1, text: 'see https://site.example/a now' });
+  context.maybeRenderLinkPreview(row, { type: 2, text: 'https://site.example/photo' });
+  assert.equal(calls.length, 0, 'rendering a message contacts no linked site');
+  assert.equal(wrap.appended.length, 1, 'one load button for the text message with a link');
+  const button = wrap.appended[0];
+  assert.equal(button.textContent, '미리보기 불러오기');
+  button.listeners.click();
+  button.listeners.click(); // a second click while loading does not fetch twice
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, [`/api/og?url=${encodeURIComponent('https://site.example/a')}`]);
+  assert.match(button.replacedBy.innerHTML, /Fixture &lt;b&gt;title&lt;\/b&gt;/, 'preview text is escaped');
+});

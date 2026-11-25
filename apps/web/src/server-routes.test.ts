@@ -129,3 +129,21 @@ test('with the session, the panel reports a disconnected daemon and writes need 
   assert.deepEqual(await offline.json(), { error: 'Not connected to the daemon; nothing was sent', code: 'DAEMON_NOT_CONNECTED', uncertain: false, retryable: true });
   assert.equal((await post('/api/control/pause', { paused: true })).status, 503);
 });
+
+test('a malformed request target is answered with 400 and the GUI keeps serving', async () => {
+  const { base, cookie, token } = await session();
+  const { hostname, port } = new URL(base);
+  const net = await import('node:net');
+  for (const target of ['//', '//[', '//user@']) {
+    const reply = await new Promise<string>((resolve, reject) => {
+      const socket = net.connect(Number(port), hostname, () => socket.end(`GET ${target} HTTP/1.1\r\nHost: ${hostname}:${port}\r\nConnection: close\r\n\r\n`));
+      let data = '';
+      socket.on('data', (d) => (data += d));
+      socket.on('end', () => resolve(data));
+      socket.on('error', reject);
+    });
+    assert.match(reply, /^HTTP\/1\.1 400 /, target);
+  }
+  const ok = await fetch(`${base}/api/state`, { headers: { cookie, [TOKEN]: token } });
+  assert.equal(ok.status, 200, 'the process survived');
+});

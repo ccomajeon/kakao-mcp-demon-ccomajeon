@@ -1027,20 +1027,36 @@ function appendMessageElement(m, container) {
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
 const ogInflight = new Set();
+// Opening a room never contacts a linked site: fetching a received link would tell its sender when
+// the room was read and from which address. The preview loads only when the person asks for it.
 function maybeRenderLinkPreview(row, m) {
   if (!m || m.type !== 1 || !m.text) return;
   const match = m.text.match(URL_RE);
   if (!match) return;
   const link = match[0];
   const wrap = row.querySelector('.msg-bubble-wrap');
-  if (!wrap || wrap.querySelector('.link-preview')) return;
-  const key = `${row.dataset.msgId}|${link}`;
+  if (!wrap || wrap.querySelector('.link-preview, .link-preview-load')) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'link-preview-load';
+  button.textContent = '미리보기 불러오기';
+  button.title = '링크한 사이트에 접속해 제목과 설명을 가져옵니다';
+  button.addEventListener('click', () => loadLinkPreview(wrap, button, `${row.dataset.msgId}|${link}`, link));
+  wrap.appendChild(button);
+}
+
+function loadLinkPreview(wrap, button, key, link) {
   if (ogInflight.has(key)) return;
   ogInflight.add(key);
+  button.disabled = true;
+  button.textContent = '불러오는 중…';
   api(`/api/og?url=${encodeURIComponent(link)}`)
     .then((og) => {
       // Preview text only: the page never loads a linked site's image (it could point at any host).
-      if (!og || og.error || (!og.title && !og.description)) return;
+      if (!og || og.error || (!og.title && !og.description)) {
+        button.textContent = '미리보기 없음';
+        return;
+      }
       const card = document.createElement('a');
       card.className = 'link-preview';
       card.href = og.url || link;
@@ -1052,9 +1068,12 @@ function maybeRenderLinkPreview(row, m) {
           ${og.description ? `<div class="link-preview-desc">${esc(og.description)}</div>` : ''}
           <div class="link-preview-site">${esc(og.siteName || new URL(og.url || link).hostname)}</div>
         </div>`;
-      wrap.appendChild(card);
+      button.replaceWith(card);
     })
-    .catch(() => {})
+    .catch(() => {
+      button.disabled = false;
+      button.textContent = '미리보기 다시 시도';
+    })
     .finally(() => ogInflight.delete(key));
 }
 

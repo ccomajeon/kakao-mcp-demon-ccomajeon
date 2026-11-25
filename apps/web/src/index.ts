@@ -328,11 +328,31 @@ function serveStatic(res: http.ServerResponse, file: string) {
   fs.createReadStream(full).pipe(res);
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+/** Answer an unexpected failure with 500 and keep serving: one request never ends the GUI process. */
+function failRequest(res: http.ServerResponse, e: unknown) {
+  console.warn(`[server] request failed: ${e instanceof Error ? e.name : typeof e}`);
+  if (res.headersSent) return void res.destroy();
+  try {
+    sendJson(res, 500, { error: 'Internal error' });
+  } catch {
+    res.destroy();
+  }
+}
+
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((e) => failRequest(res, e));
+});
+
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<unknown> {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+  let url: URL;
+  try {
+    url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  } catch {
+    return sendJson(res, 400, { error: 'Bad request target' });
+  }
   const p = url.pathname;
   const port = (server.address() as AddressInfo).port;
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
   const problem = localRequestProblem(req, port);
   if (problem) return sendJson(res, 403, { error: `Refused: only this GUI's own page may use the API (${problem})` });
   if (p === '/launch' && req.method === 'GET') {
@@ -666,7 +686,7 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     return sendJson(res, 500, { error: (e as Error).message });
   }
-});
+}
 
 async function main() {
   server.listen(PORT, '127.0.0.1', () => {
