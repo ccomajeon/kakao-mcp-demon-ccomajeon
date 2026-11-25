@@ -49,6 +49,6 @@ squash-merged) and pull request description stays visible.
 - Describe changes in product terms. Say "verified on a real account", never which account, host or room.
 - Keep session notes, handovers and private procedures where your environment's instructions say,
   never in this repository, a commit or a pull request.
-- `npm ci` installs Git hooks (`.githooks/`) that run `scripts/check-private-terms.mjs` on staged
-  changes, commit messages and pushes; CI repeats it. Never bypass them with `--no-verify`. If a
-  check fails, rewrite the text rather than working around the check.
+- `npm ci` installs Git hooks into the clone's own hooks directory that run `origin/main`'s
+  `scripts/check-private-terms.mjs` on staged changes, commit messages and pushes; CI repeats it.
+  Never bypass them with `--no-verify`. If a check fails, rewrite the text rather than working around the check.

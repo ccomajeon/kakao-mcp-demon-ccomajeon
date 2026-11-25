@@ -41,7 +41,7 @@
     "check:publication": "node scripts/check-publication.mjs",
     "check:private-terms": "node scripts/check-private-terms.mjs --tree HEAD",
     "pretest": "npm run build --workspace=@kakao-mcp/protocol",
-    "test": "node --test scripts/check-private-terms.test.mjs && npm run test --workspaces --if-present",
+    "test": "node --test scripts/check-private-terms.test.mjs scripts/install-git-hooks.test.mjs && npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "build:package": "node scripts/build-package.mjs",
     "check:package": "node scripts/check-package.mjs",
@@ -51,7 +51,7 @@
     "presetup": "npm run build --workspace=@kakao-mcp/protocol",
     "setup": "node --experimental-strip-types apps/mcp/src/setup.ts",
     "typecheck": "npm run build --workspace=@kakao-mcp/protocol && tsc -p packages/core/tsconfig.json && tsc -p apps/mcp/tsconfig.json && tsc -p packages/client/tsconfig.json && tsc -p apps/cli/tsconfig.json && tsc -p apps/web/tsconfig.json",
-    "prepare": "node -e \"try{require('node:child_process').execFileSync('git',['config','core.hooksPath','.githooks'],{stdio:'ignore'})}catch{}\"",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "prepack": "npm run build:package",
     "kakao-mcp-ccomajeon": "node --experimental-strip-types apps/cli/src/index.ts"
   },

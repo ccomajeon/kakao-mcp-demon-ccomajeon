@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Reject private terms in what is about to become public: added lines, file names, commit messages and PR text.
-// Reports only where a match is, never the matched value or a maintainer pattern, so CI logs reveal neither.
+// Public patterns report where a match is, never the matched value. Maintainer patterns report only how many
+// matches there are: a location and a pattern number for text the author controls would let anyone who can
+// trigger the check and read its log recover the maintainer's terms one by one.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -24,7 +26,7 @@ function privatePatterns() {
   }
   if (!text) return undefined;
   return text.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'))
-    .map((source, i) => [`private term #${i + 1}`, new RegExp(source, 'i')]);
+    .map(source => new RegExp(source, 'i'));
 }
 
 function parseArgs(argv) {
@@ -109,16 +111,20 @@ try {
   const priv = privatePatterns();
   if (!priv && o.requirePrivate) throw new Error('The maintainer deny list is required here but was not provided');
   if (!priv) process.stderr.write('Private-terms check: maintainer list not found, checking public patterns only\n');
-  const patterns = [...PUBLIC, ...(priv ?? [])];
   const hits = [];
+  let privateHits = 0;
   for (const { where, text, generatedGitHubCommitter } of subjects(o)) {
-    for (const [label, re] of patterns) {
+    for (const [label, re] of PUBLIC) {
       if (label === 'email address' && generatedGitHubCommitter) continue;
       if (re.test(text)) hits.push(`${where}: ${label}`);
     }
+    for (const re of priv ?? []) if (re.test(text)) privateHits++;
   }
-  if (hits.length) {
-    process.stderr.write(`Private-terms check failed. Rewrite these in product terms (never bypass the check):\n${[...new Set(hits)].map(h => `  ${h}`).join('\n')}\n`);
+  if (hits.length || privateHits) {
+    const lines = [...new Set(hits)].map(h => `  ${h}`);
+    // Never say which maintainer term matched or where: only that some did.
+    if (privateHits) lines.push(`  ${privateHits} match(es) of the maintainer deny list (locations are not shown; search your change for those terms)`);
+    process.stderr.write(`Private-terms check failed. Rewrite these in product terms (never bypass the check):\n${lines.join('\n')}\n`);
     process.exitCode = 1;
   } else process.stdout.write('Private-terms check passed\n');
 } catch (error) {

@@ -21,8 +21,13 @@ CI의 배포된 검사기 바이너리는 버전과 SHA-256을 함께 고정합�
 
 `check:private-terms`는 추가된 줄·파일 이름·커밋 메시지·PR 제목과 설명에서 개인정보 패턴과 관리자의 비공개 용어 목록을
 찾습니다. 목록은 이 저장소에 없고, 로컬에서는 `KAKAO_MCP_DENYLIST_FILE` 또는 체크아웃 옆의 관리자 저장소에서,
-CI에서는 `KAKAO_MCP_DENYLIST` secret에서 읽습니다. 결과에는 위치만 나오고 일치한 값이나 목록 항목은 출력하지 않습니다.
-PR 검사는 `pull_request_target`으로 base 브랜치의 검사기를 실행하며 PR 코드를 실행하지 않습니다.
+CI에서는 `KAKAO_MCP_DENYLIST` secret에서 읽습니다. 공개 패턴은 위치만 출력하고, 비공개 용어 목록은 일치한 개수만
+출력합니다. 어느 항목이 어디서 일치했는지는 로그에 남기지 않습니다.
+PR 검사는 `pull_request_target`으로 base 브랜치의 검사기를 실행하며 PR 코드를 실행하지 않습니다. 비공개 목록은 이 저장소의
+브랜치에서 연 PR과 `main` push에만 주고, fork PR은 공개 패턴으로만 검사합니다.
+
+로컬 Git hook은 `npm ci`가 clone 자신의 hook 폴더에 설치하며, 추적되는 폴더를 `core.hooksPath`로 쓰지 않습니다.
+hook은 `origin/main`의 검사기를 실행합니다. 외부 PR은 hook과 비공개 목록이 없는 별도 clone에서 검토합니다.
 
 Linux CI가 실제로 시작돼 Node 22 테스트·systemd 권한 fixture까지 통과했는지 확인합니다.
 GitHub 결제/지출 한도로 실행이 시작되지 않았다면 로컬 macOS 통과로 Linux 검증을 대체하지 않습니다.

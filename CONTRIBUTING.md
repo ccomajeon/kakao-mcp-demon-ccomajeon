@@ -17,9 +17,13 @@ npm run check:package
 
 배포 패키지 구성과 점검은 [npm 패키지](docs/runbooks/package.md)를 봅니다.
 
-`npm ci`는 Git hook(`.githooks/`)을 설치합니다. 커밋·커밋 메시지·push 때 전화번호·이메일 같은 개인정보와
+`npm ci`는 `scripts/install-git-hooks.mjs`로 이 clone의 Git hook 폴더(`git rev-parse --git-path hooks`)에
+pre-commit·commit-msg·pre-push hook을 설치합니다. 커밋·커밋 메시지·push 때 전화번호·이메일 같은 개인정보와
 관리자가 지정한 비공개 용어를 검사합니다. 커밋 메시지와 PR 설명도 공개되므로 같은 기준을 지킵니다.
 `--no-verify`로 건너뛰지 말고 문구를 고쳐 주세요. CI가 같은 검사를 다시 합니다.
+hook은 체크아웃한 브랜치가 아니라 `origin/main`의 검사기를 실행합니다(`origin/main`이 없을 때만 경고와 함께 작업 사본).
+직접 만든 hook이 이미 있으면 덮어쓰지 않으니 같은 검사를 직접 추가해 주세요. 예전 버전이 설정한
+`core.hooksPath=.githooks`는 자동으로 해제합니다. 외부 기여자의 PR은 hook이 설치되지 않은 별도 clone에서 검토합니다.
 
 `npm test`는 protocol을 먼저 빌드합니다. Node는 strip-types와 `node:sqlite`를 지원해야 합니다(CI는 Node 22).
 코드는 strict TypeScript를 Node strip-types로 실행하므로 enum과 parameter property 문법을 쓰지 않습니다.
