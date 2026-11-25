@@ -240,7 +240,7 @@ AI가 설치를 대신할 때도 이 문장을 바꾸지 않고 이용자에게 
 - `get_status`의 `agentMode`·`roomContentDefault`, 모드별 서버 instructions(`apps/mcp/src/instructions.ts`).
 - 운영자 명령 `npm run setup -- --mode ask|trust [--accept-risk] [--env 경로]`: `--accept-risk` 없는 trust는 §5 문장만 출력하고 멈춘다.
   자동 저장이 켜진 상태에서 `ask`로 바꾸는 것은 거절한다. 관리형 설치가 있는 서버에서는 `--env` 없이도 서비스의 설정 파일에
-  sudo로 저장하고, 사람이 확인하면 서비스를 다시 시작한다(실행 중 일시정지는 풀린다는 안내와 함께).
+  sudo로 저장하고, 사람이 확인하면 서비스를 다시 시작한다(2026-11-25부터 일시정지는 재시작 뒤에도 유지된다).
 - 설치(bootstrap) 흐름이 로그인 성공 뒤 모드를 묻는다(2026-10-31). Enter는 `ask`, `trust`는 §5 문장을 보여 주고 다시 확인한다.
 - 공개용 `AGENTS.md`에 모드 규칙을 더했다.
 

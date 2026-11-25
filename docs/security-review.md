@@ -49,6 +49,37 @@
 
 검증: 전체 `npm test` 734개 중 729 통과·실패 0·건너뜀 5, `npm run typecheck`, `npm run check:package`, `git diff --check` 통과. `npm audit` 알려진 취약점 0건.
 
+## 2026-11-25 2차 검사와 수정
+
+지난 수정(SEC-05~SEC-14)을 우회할 수 있는지와, 앞선 검사가 깊게 보지 않은 데몬 내부·프로토콜·CI·Docker를 다시 검사했다. 범위와 한계는 위와 같다(소스·로컬 재현 테스트, 실계정·운영 서버·GitHub 실행 미포함). SEC-05(접속 사용자 확인)·SEC-08(웹 인증)·SEC-11(CLI 출력)은 우회되지 않았다.
+
+| ID / 평가 | 확인된 영향과 전제 | 수정 및 증거 |
+|---|---|---|
+| SEC-15 / Medium | 손상된 수신 프레임 하나로 복호화 예외가 처리되지 않아 데몬 프로세스가 종료됐다. 같은 네트워크에서 통신에 끼어들 수 있는 공격자가 반복할 수 있었고, 재시작되면 일시정지도 풀렸다 | `packages/protocol/src/transport/loco-stream.ts`(신규), `loco-session.ts`, `loco-client.ts`, `trailer-client.ts`: 수신 오류를 잡아 연결만 닫고 재연결, 프레임 16 MiB·본문 32 MiB 상한, `close()` 뒤 소켓 정리. `loco-stream.test.ts`. 로컬 가짜 서버 재현이 수정 전 종료, 수정 후 생존 |
+| SEC-16 / Medium | 승인 전 작업 기록이 지워지지 않아, 승인 없이 1만 건을 채우면 전송·승인·일시정지 해제가 영구히 막혔다 | `packages/core/src/agent-send.ts`: 외부 효과 없는 만료 기록 정리, 새 작업 분당 30건 제한. 실행됐거나 결과가 불확실한 기록은 지우지 않음. `agent-send.test.ts` |
+| SEC-17 / Medium | 링크 미리보기 HTML 파싱 정규식이 입력 크기에 대해 3제곱으로 느려져, 링크 하나로 웹 화면이 멈췄다 | `apps/web/src/og.ts`: 선형 파서, `</head>` 앞 64K자·태그당 2048자 제한, 다운로드 256KB. `og.test.ts` 시간 회귀(512KB 병적 입력 각각 100ms 미만) |
+| SEC-18 / Medium | 포크 PR에서도 비공개 금지어 목록으로 검사하고 걸린 위치·번호를 공개 로그에 남겨, 후보 단어로 목록을 알아낼 수 있었다 | `.github/workflows/private-terms.yml`: 비공개 목록은 같은 저장소 PR·push에만 사용. `scripts/check-private-terms.mjs`: 비공개 항목은 개수만 출력 |
+| SEC-19 / Medium | Git 훅 경로가 추적되는 `.githooks`여서, 훅을 추가한 외부 PR 브랜치를 체크아웃만 해도 그 코드가 실행됐다 | `scripts/install-git-hooks.mjs`: 클론 자체 훅 폴더에 표식 있는 스텁 설치, 스텁은 `origin/main`의 검사기 실행. `.githooks/` 삭제. `install-git-hooks.test.mjs` |
+| SEC-20 / Medium (문서) | Docker 연결(`docker exec`)에서는 AI 클라이언트 사용자가 토큰·설정·승인 저장소를 읽고 바꿀 수 있고 패스키로도 분리되지 않는데, 안내문이 그렇지 않은 것처럼 적혀 있었다 | `docs/runbooks/docker.md`: 시험용 전용임과 이 경계를 명시 |
+| SEC-21 / Low | 패스키 승인 링크가 에이전트에게도 전달되어, 가려 둔 메시지 본문을 링크로 승인 전에 읽을 수 있었다(SEC-07 우회) | `apps/mcp/src/approval-server.ts`·`approval-page.ts`, `packages/core/src/approvals.ts`: 링크만으로는 가린 사본, 원문은 패스키 사용자 확인 뒤에만 표시 |
+| SEC-22 / Low | 승인 창에서 방 이름이 서버가 쓴 정보 앞에 와서 그 형식을 흉내 낼 수 있었고, 채움 문자로 실제 정보를 밀어낼 수 있었다. 친구 대상 작업은 숫자 ID만 보였다 | `apps/mcp/src/client-approval.ts`: 서버 정보를 먼저, 이름은 따옴표로 40자까지, 채움·서식 문자 표시, 친구 이름 표시 |
+| SEC-23 / Low | 오류 응답 안의 방 이름·닉네임에 신뢰할 수 없다는 표시가 없었다 | `redactApprovalForAgent`가 `untrustedFields`를 붙이고 `mcp-stdio.ts`가 untrusted로 감쌈 |
+| SEC-24 / Low (trust에서 Medium) | `open_direct_chat`이 동명이인·상태메시지 일치를 구분 없이 하나만 골랐다 | `packages/core/src/friends.ts` `resolve()`: 상태메시지 제외, 둘 이상이면 후보와 `ambiguous`만 반환 |
+| SEC-25 / Low | `self_delete_messages`가 권한·개수 검사 없이 임의 ID를 숨겼다 | 숫자 ID·그 방에 저장된 메시지만, 방 읽기 규칙과 운영자 상한 확인, 호출당 50개·하루 200개, 감사 기록 |
+| SEC-26 / Low | `forward_message`가 임의 메시지 종류와 첨부 JSON을 받아 미디어를 텍스트 확인 창으로 전달할 수 있었다 | `packages/core/src/agent-publication.ts`: 텍스트(type 1)만 허용 |
+| SEC-27 / Low | 일시정지가 메모리에만 있어 재시작하면 풀렸다 | `packages/core/src/policy.ts`: SQLite에 저장하고 시작 시 복원. 해제는 계속 사람 승인 |
+| SEC-28 / Low | 링크 수집의 끝 문장부호 제거 정규식이 2제곱으로 느렸다 | `curation-tools.ts`: 문자 루프, URL 2048자 제한 |
+| SEC-29 / Low | 인증 전 요청 하나(`GET //`)로 웹 화면 프로세스가 종료됐다 | `apps/web/src/index.ts`: 주소 파싱 실패 400, 처리 중 예외 500 |
+| SEC-30 / Low | 방을 열면 링크 미리보기를 자동으로 불러와 보낸 사람이 열람 시각과 IP를 알 수 있었다 | `apps/web/public/app.js`: 버튼을 눌렀을 때만 불러옴 |
+| SEC-31 / Low | `.env.local`을 비운 뒤 다시 써서, 쓰기 실패 시 기기 키와 운영 설정이 사라질 수 있었다 | `packages/core/src/credentials.ts`: 비우지 않고 덮어쓴 뒤 길이 조정·fsync |
+| SEC-32 / Low | 읽기 확인 창의 "앞으로 묻지 않기"가 운영자 상한 밖 방에도 규칙을 저장했다 | `client-approval.ts`: 상한 밖 방은 기억 선택지를 내지 않고 응답 시점에도 다시 확인 |
+| SEC-33 / Low | 배포 워크플로가 테스트·설치까지 OIDC 권한 안에서 돌렸고 액션이 태그로만 고정돼 있었다 | `.github/workflows/publish.yml`: 빌드와 배포 작업 분리, 배포는 tgz `--ignore-scripts`만, 모든 워크플로 액션 SHA 고정 |
+| SEC-34 / Low | Docker: 로그인 거절 시 무한 재시작, 자원 제한 없음, 비밀번호가 환경변수로 전달, 개발 의존성이 이미지에 포함 | `docker/`: `restart: on-failure:3`, 메모리 512m·pids 128, 상태 검사, 비밀번호 stdin 전달, 2단계 빌드, `.dockerignore` 허용 목록 |
+
+남은 사항: 숨긴 메시지를 되돌리는 경로가 없다. trust 모드에서 실제 실행된 작업 기록은 지우지 않으므로 1만 건이 차면 운영자 정리가 필요하다. 수신 메시지 저장에는 아직 보존 기간·용량 상한이 없다. LocoV2SL 자체에 순방향 비밀성과 프레임 순번이 없는 것은 클라이언트에서 고칠 수 없다. GitHub에서 새 워크플로(특히 배포 작업)를 실제로 실행해 보지는 않았다.
+
+검증: 전체 `npm test` 774개 중 769 통과·실패 0·건너뜀 5, `npm run typecheck`, `npm run check:package`, `npm run check:publication`, `git diff --check` 통과. 손상된 프레임 재현이 수정 후 프로세스를 종료시키지 않는 것을 확인했다.
+
 ## 의존성과 비밀정보 검사
 
 - 앱의 `npm audit --json`: 알려진 취약점 0건. 개발·선택 의존성을 포함한 lockfile 검사다. 악성 패키지나 모든 로직 오류를 증명하는 검사가 아니다.
