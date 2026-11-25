@@ -1,0 +1,10 @@
+#!/bin/sh
+# Container health check: healthy only when the daemon answers get_status with a connected session.
+# Prints no tokens or account IDs.
+set -eu
+cd /data
+if ! grep -q '^KAKAO_ACCESS_TOKEN=.' /data/.env.local 2>/dev/null; then
+  echo '[health] account not linked yet (run kakao-login)'
+  exit 1
+fi
+exec node --disable-warning=ExperimentalWarning --experimental-strip-types /app/apps/mcp/src/healthcheck.ts

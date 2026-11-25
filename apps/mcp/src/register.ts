@@ -18,6 +18,8 @@
 //   KAKAO_EMAIL       account email               (required; .env.local)
 //   KAKAO_PASSWORD    account password            (required; sensitive — .env.local only)
 //   KAKAO_DEVICE_NAME device label (default below)
+//   --password-stdin  read the password from the first line of standard input instead
+//                     (used by the Docker login script so it never sits in an environment)
 //
 // Run:  npm run register --workspace=@kakao-mcp/mcp
 // Safe to re-run; it rewrites only the KAKAO_* keys it owns. Zero runtime deps;
@@ -59,6 +61,20 @@ export function persistRegistration(input: RegistrationPersistInput): void {
   });
 }
 
+const MAX_PASSWORD_INPUT = 4096;
+
+/** The first line of `input` without its line ending; leading and trailing spaces are kept. Never echoed. */
+export async function readPasswordLine(input: AsyncIterable<Buffer | string>): Promise<string> {
+  let data = '';
+  for await (const chunk of input) {
+    data += chunk.toString();
+    const end = data.indexOf('\n');
+    if (end >= 0) { data = data.slice(0, end); break; }
+    if (data.length > MAX_PASSWORD_INPUT) throw new Error('password input is too long');
+  }
+  return data.replace(/\r$/, '');
+}
+
 /** Format the registration outcome for a human running the CLI (never prints tokens). */
 export function describeResult(res: SignRegistrationResult): string {
   if (res.status === 0 && res.credentials?.accessToken) {
@@ -70,7 +86,9 @@ export function describeResult(res: SignRegistrationResult): string {
 async function main(): Promise<void> {
   const log = (line: string) => process.stderr.write(`[register] ${line}\n`);
 
-  const { email, password, deviceName, envPath } = CredentialStore.readOptional();
+  const configured = CredentialStore.readOptional();
+  const { email, deviceName, envPath } = configured;
+  const password = process.argv.includes('--password-stdin') ? await readPasswordLine(process.stdin) : configured.password;
   if (!email || !password) {
     log('Missing KAKAO_EMAIL / KAKAO_PASSWORD. Set them in .env.local (password is sensitive —');
     log(`.env.local only), then re-run. ${setupCommand()} does this for a new Linux install.`);
