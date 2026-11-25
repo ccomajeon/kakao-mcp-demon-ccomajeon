@@ -59,6 +59,20 @@ export interface ExtractedScheduleAndTodos {
   analyzedMessageCount: number;
 }
 
+/** Longest URL token collected; longer ones are skipped (browsers and servers commonly stop near this). */
+export const MAX_URL_CHARS = 2048;
+const TRAILING_PUNCTUATION = new Set(['.', ',', ';', '!', '?', ')', '>']);
+
+/**
+ * Strip sentence punctuation after a URL with one backwards scan. A regex anchored at the end
+ * (`/[.,;!?)>]+$/`) retries from every position of a long punctuation run and takes quadratic time.
+ */
+export function trimTrailingPunctuation(url: string): string {
+  let end = url.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(url[end - 1])) end--;
+  return url.slice(0, end);
+}
+
 /**
  * Extract and categorize all URLs shared in messages.
  */
@@ -90,8 +104,9 @@ export function collectSharedLinks(
     if (!matches) continue;
 
     for (const rawUrl of matches) {
-      // Clean trailing punctuation
-      const cleanUrl = rawUrl.replace(/[.,;!?)>]+$/, '');
+      // Message text is untrusted: a giant token is no usable link, and must not cost more than a linear scan.
+      if (rawUrl.length > MAX_URL_CHARS) continue;
+      const cleanUrl = trimTrailingPunctuation(rawUrl);
       let domain = '';
       try {
         domain = new URL(cleanUrl).hostname.toLowerCase();

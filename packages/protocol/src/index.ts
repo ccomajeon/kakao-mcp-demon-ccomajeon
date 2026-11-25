@@ -3,6 +3,7 @@ export * from './crypto/loco-crypto.js';
 export * from './authentication/auth-client.js';
 export * from './authentication/device-registration.js';
 export * from './transport/loco-client.js';
+export * from './transport/loco-stream.js';
 export * from './transport/loco-session.js';
 export * from './transport/trailer-client.js';
 export * from './transport/loco-parse.js';

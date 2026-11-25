@@ -85,6 +85,29 @@ export function loadPolicyConfig(opts: { envPath?: string; env?: Record<string, 
 }
 
 /**
+ * Durable storage for the pause switch. Releasing a pause needs the person's approval, so a restart (crash,
+ * service manager, container restart policy, a respawned stdio client) must not release it either.
+ */
+export interface PauseStore {
+  /** The saved switch, or undefined when nothing was saved yet. */
+  load(): boolean | undefined;
+  save(paused: boolean): void;
+}
+
+const PAUSE_META_KEY = 'policy-pause';
+
+/** Keep the pause switch in the account database's `meta` table. An unreadable value counts as paused. */
+export function metaPauseStore(db: { getMeta(key: string): string | undefined; setMeta(key: string, value: string): void }): PauseStore {
+  return {
+    load: () => {
+      const value = db.getMeta(PAUSE_META_KEY);
+      return value === undefined ? undefined : value !== 'running';
+    },
+    save: (paused) => db.setMeta(PAUSE_META_KEY, paused ? 'paused' : 'running')
+  };
+}
+
+/**
  * The runtime limits for outbound operations. `decide()` is a pure function of the current
  * config, pause state and rate window; `authorize()` adds the rate slot and audit entry, and
  * is called only after the journaled service verified human approval.
@@ -219,10 +242,44 @@ export class SendPolicy {
   }
 
   private readonly pauseListeners = new Set<() => void>();
+  private pauseStore?: PauseStore;
   onPauseChanged(listener: () => void): () => void { this.pauseListeners.add(listener); return () => { this.pauseListeners.delete(listener); }; }
+
+  /**
+   * Restore the saved pause switch and save every later change. Call before serving any tool. A saved pause keeps
+   * the daemon paused; KAKAO_PAUSED still pauses at start (that start-up choice is not saved).
+   */
+  usePauseStore(store: PauseStore): void {
+    let saved: boolean | undefined;
+    try { saved = store.load(); }
+    catch (cause) { throw new KakaoError('INTERNAL', 'The saved pause state could not be read', { cause }); }
+    this.pauseStore = store;
+    if (saved === true && !this.paused) this.applyPause(true);
+  }
+
+  /**
+   * Engaging the pause applies at once, even when saving it fails (that failure is then reported, because a
+   * restart would release it). Releasing is saved first: if that fails, sending stays paused.
+   */
   setPaused(value: boolean): void {
+    if (!value) this.savePause(false);
+    this.applyPause(value);
+    if (value) this.savePause(true);
+  }
+
+  private applyPause(value: boolean): void {
     this.paused = value;
     for (const listener of [...this.pauseListeners]) listener();
+  }
+
+  private savePause(value: boolean): void {
+    if (!this.pauseStore) return;
+    try { this.pauseStore.save(value); }
+    catch (cause) {
+      throw new KakaoError('INTERNAL', value
+        ? 'Sending is paused now, but the pause could not be saved; a restart would release it'
+        : 'The pause state could not be saved; sending stays paused', { cause });
+    }
   }
 
   isPaused(): boolean {

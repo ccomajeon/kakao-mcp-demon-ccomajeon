@@ -4,9 +4,10 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { BSON } from 'bson';
-import { encodeLocoPacket, decodeLocoPacket, LOCO_HEADER_SIZE, LocoPacket } from '../framing/loco-packet.js';
+import { encodeLocoPacket, decodeLocoPacket, LocoPacket } from '../framing/loco-packet.js';
 import { createLocoV2Handshake, encryptLocoV2Frame } from '../crypto/loco-crypto.js';
-import { drainLocoFrames, locoBodyLength, ConversationItem, LoginListResult, LocoClient, BookingResult } from './loco-client.js';
+import { ConversationItem, LoginListResult, LocoClient, BookingResult } from './loco-client.js';
+import { LocoStreamDecoder } from './loco-stream.js';
 import {
   parseChatLog,
   parseLoginList,
@@ -252,6 +253,9 @@ export interface SyncResult {
   raw: Record<string, any>;
 }
 
+/** How long close() waits for the peer to finish the TCP close before dropping the socket. */
+const CLOSE_GRACE_MS = 1000;
+
 type Pending = { method: string; resolve: (p: LocoPacket) => void; reject: (e: Error) => void; timer: NodeJS.Timeout };
 
 /**
@@ -272,8 +276,7 @@ type Pending = { method: string; resolve: (p: LocoPacket) => void; reject: (e: E
 export class LocoSession extends EventEmitter {
   private socket?: net.Socket;
   private aesKey?: Uint8Array;
-  private incoming = Buffer.alloc(0);
-  private plain = Buffer.alloc(0);
+  private decoder?: LocoStreamDecoder;
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private pingTimer?: NodeJS.Timeout;
@@ -947,8 +950,13 @@ export class LocoSession extends EventEmitter {
   }
 
   close(): void {
+    const socket = this.socket;
     this.handleClose();
-    this.socket?.end();
+    if (!socket || socket.destroyed) return;
+    socket.end();
+    // Received bytes are ignored once closed; a peer that never finishes the close must not keep a
+    // half-open socket (and its kernel buffers) alive, so drop it after a short grace period.
+    setTimeout(() => socket.destroy(), CLOSE_GRACE_MS).unref();
   }
 
   /** Abruptly drop the underlying socket (no FIN) to simulate a network drop — for testing reconnect. */
@@ -996,18 +1004,20 @@ export class LocoSession extends EventEmitter {
   }
 
   private onData(chunk: Buffer): void {
-    this.incoming = Buffer.concat([this.incoming, chunk]);
-    const { plaintext, consumed } = drainLocoFrames(this.incoming, this.aesKey!);
-    if (consumed > 0) {
-      this.incoming = this.incoming.subarray(consumed);
-      this.plain = Buffer.concat([this.plain, plaintext]);
+    if (this.closed) return;
+    if (!this.aesKey) return this.abort(new LocoError('MALFORMED', 'carriage data arrived before the handshake'));
+    this.decoder ??= new LocoStreamDecoder(this.aesKey);
+    let packets: Buffer[];
+    try {
+      packets = this.decoder.push(chunk);
+    } catch (err) {
+      // A frame that is too short, oversized or fails authentication leaves the stream unusable.
+      // It must never escape the socket listener (that would end the process): drop the link so
+      // pending requests reject and the reconnect path runs.
+      return this.abort(err instanceof LocoError ? err : new LocoError('MALFORMED', 'carriage frame could not be decrypted', { cause: err }));
     }
-    // Parse every complete LOCO packet in the plaintext stream.
-    for (;;) {
-      const bodyLen = locoBodyLength(this.plain);
-      if (bodyLen === null || this.plain.length < LOCO_HEADER_SIZE + bodyLen) break;
-      const packetBytes = this.plain.subarray(0, LOCO_HEADER_SIZE + bodyLen);
-      this.plain = this.plain.subarray(LOCO_HEADER_SIZE + bodyLen);
+    // Dispatch every complete LOCO packet in the plaintext stream.
+    for (const packetBytes of packets) {
       let decoded: LocoPacket;
       try {
         decoded = decodeLocoPacket(packetBytes);
@@ -1339,13 +1349,23 @@ export class LocoSession extends EventEmitter {
     }
   }
 
-  private handleClose(): void {
+  /** Fail the session on an unrecoverable stream error: report it, close, and drop the socket. */
+  private abort(err: LocoError): void {
+    const socket = this.socket;
+    this.reportError(err);
+    this.handleClose(err);
+    socket?.destroy();
+  }
+
+  private handleClose(cause?: Error): void {
     if (this.closed) return;
     this.closed = true;
+    this.decoder = undefined;
     if (this.pingTimer) clearInterval(this.pingTimer);
     for (const [, p] of this.pending) {
       clearTimeout(p.timer);
-      p.reject(new LocoError('CLOSED', 'session closed', { command: p.method }));
+      // Stays CLOSED (outcome unknown for a write in flight); the stream error is kept as the cause.
+      p.reject(new LocoError('CLOSED', 'session closed', { command: p.method, ...(cause ? { cause } : {}) }));
     }
     this.pending.clear();
     this.emit('close');

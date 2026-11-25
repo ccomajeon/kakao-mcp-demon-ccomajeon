@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, type AgentMessage, type AgentSendAdapter, type RoomReview } from './agent-send.ts';
+import { AgentSendJournal, AgentSendService, parseAgentMessage, clientMsgIdFor, SETTLE_GRACE_MS, PREPARE_PER_MINUTE, type AgentMessage, type AgentSendAdapter, type RoomReview } from './agent-send.ts';
 import { LocoError } from '@kakao-mcp/protocol';
 import { fixtureApprovals } from './approval-fixture.test-helper.ts';
 import { SendPolicy } from './policy.ts';
@@ -323,4 +323,72 @@ test('incomplete history or a failed lookup leaves the send uncertain and never 
     await assert.rejects(f.service.send(id, f.message), { code: 'SEND_OUTCOME_UNKNOWN' });
     assert.equal(f.calls(), 1);
   }
+});
+
+// ── journal bounds: preparing needs no approval, so it must never fill the journal for good ──
+
+function journalRow(id: string, at: number, state: import('./agent-send.ts').AgentOperationState = 'prepared') {
+  return { request_id: id, payload_digest: 'fixture', room_digest: 'fixture', attempted_at: null, context_digest: 'fixture',
+    policy_digest: 'fixture', created_at: at, expires_at: at + 5 * 60_000, state, message_id: null, category: 'message-as-you' as const };
+}
+
+test('a flood of prepared operations is rate limited per minute and never reaches the journal capacity', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-journal-'));
+  const journal = AgentSendJournal.open(root);
+  t.after(() => { journal.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  journal.db.db.exec('PRAGMA synchronous = OFF'); // a throwaway fixture: skip fsync to keep the flood fast
+  let now = 1_000_000;
+  for (let i = 0; i < PREPARE_PER_MINUTE; i++) journal.prepare(journalRow(randomUUID(), now));
+  assert.throws(() => journal.prepare(journalRow(randomUUID(), now)), (e: any) => e.code === 'RATE_LIMITED' && e.retryable === true);
+  // An idempotent replay of an existing request ID is not a new operation.
+  const existing = journal.inState('prepared', 1)[0];
+  assert.equal(journal.prepare(journalRow(existing, now)).request_id, existing);
+  // Keep flooding at the cap: once old never-approved rows start to be purged, the journal stops growing.
+  const sizes: number[] = [];
+  for (let minute = 1; minute <= 120; minute++) {
+    now += 60_001;
+    for (let i = 0; i < PREPARE_PER_MINUTE; i++) journal.prepare(journalRow(randomUUID(), now));
+    sizes.push(journal.usage().rows);
+  }
+  const peak = Math.max(...sizes);
+  assert.ok(peak <= PREPARE_PER_MINUTE * 96, `journal stayed bounded (peak ${peak})`);
+  assert.equal(sizes.at(-1), sizes.at(-21), 'steady state: as many rows are purged as are prepared');
+  assert.ok(peak < journal.usage().capacity / 3);
+});
+
+test('purging keeps every row that had or may have had an effect, and a purged request needs fresh approval', async t => {
+  const f = fixture(t), db = f.journal.db.db, old = 1000, later = old + 2 * 60 * 60_000;
+  const keep: string[] = [], purge: string[] = [];
+  for (const state of ['approved', 'sending', 'sent_unverified', 'send_unknown', 'applied_unverified', 'mutation_unknown', 'applied'] as const) {
+    const id = randomUUID(); f.journal.prepare(journalRow(id, old, state)); keep.push(id);
+  }
+  const claimed = randomUUID(); f.journal.prepare(journalRow(claimed, old, 'expired')); keep.push(claimed);
+  db.prepare('UPDATE agent_send_operations SET attempted_at = ? WHERE request_id = ?').run(old, claimed);
+  const attempted = randomUUID(); f.journal.prepare(journalRow(attempted, old, 'stale')); keep.push(attempted);
+  f.journal.recordAttempt(attempted, { chatId: '123456789', msgId: 1, since: '0', at: old });
+  const permitted = randomUUID(); f.journal.prepare(journalRow(permitted, old, 'expired')); keep.push(permitted);
+  db.prepare('INSERT INTO recipient_permission_uses (request_id, chat_id, local_day, used_at) VALUES (?,?,?,?)').run(permitted, '123456789', '1970-01-01', old);
+  for (const state of ['prepared', 'expired', 'stale', 'rejected'] as const) {
+    const id = randomUUID(); f.journal.prepare(journalRow(id, old, state)); purge.push(id);
+  }
+  // A dead row that was approved but never committed loses its stale approval record with it.
+  db.prepare('INSERT INTO agent_approvals (request_id, envelope_digest, approver_id, verified_at) VALUES (?,?,?,?)').run(purge[0], 'fixture', 'client:fixture', old);
+
+  assert.equal(f.journal.purgeDead(old + 10 * 60_000), 0, 'nothing is purged inside its windows and margin');
+  assert.equal(f.journal.purgeDead(later), purge.length);
+  for (const id of keep) assert.ok(f.journal.get(id), 'an effectful or uncertain row is never purged');
+  for (const id of purge) assert.equal(f.journal.get(id), undefined);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM agent_approvals WHERE request_id = ?').get(purge[0])!.n, 0);
+
+  // End to end: an approved send that was never committed expires, is purged, and its request ID needs a new approval.
+  const id = randomUUID(), first = f.service.prepare(id, f.message);
+  f.approve(first);
+  f.advance(3 * 60 * 60_000);
+  f.service.prepare(randomUUID(), f.message); // any later prepare purges dead rows first
+  assert.equal(f.journal.get(id), undefined);
+  const again = f.service.prepare(id, f.message);
+  assert.equal(again.state, 'prepared');
+  assert.notEqual(again.signingText, first.signingText);
+  await assert.rejects(f.service.send(id, f.message), { code: 'APPROVAL_REQUIRED' });
+  assert.equal(f.calls(), 0);
 });

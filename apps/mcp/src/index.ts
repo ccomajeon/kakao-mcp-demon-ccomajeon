@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { McpStdioServer } from './mcp-stdio.ts';
-import { KakaoSession, SendPolicy, AgentSendService, AgentPublicationService, AgentMutationService, AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions, DailyActionLimit, approvalWindowFromConfig, loadConfig, loadPolicyConfig, KakaoError, toKakaoError, agentModeApproves, MCP_TOOL_GROUPS, SETTLE_GRACE_MS } from '@kakao-mcp/core';
+import { KakaoSession, SendPolicy, metaPauseStore, AgentSendService, AgentPublicationService, AgentMutationService, AgentOperationEngine, AGENT_CONTROL_DEFINITIONS, AgentSendJournal, ApprovalStore, ApproverRegistry, RecipientPermissions, DailyActionLimit, approvalWindowFromConfig, loadConfig, loadPolicyConfig, KakaoError, toKakaoError, agentModeApproves, MCP_TOOL_GROUPS, SETTLE_GRACE_MS } from '@kakao-mcp/core';
 import { serveSocket, parseListenSpec, validateListenSpec } from './socket-transport.ts';
 import { allowedUids } from './peer-user.ts';
 import { registerMessageInboxTools } from './tools/message-inbox.ts';
@@ -76,6 +76,8 @@ async function main() {
   const spec = listen ? parseListenSpec(listen) : undefined;
   if (spec) validateListenSpec(spec);
   agentJournal = AgentSendJournal.open(kakao.config.dataDir);
+  // Restore the pause switch before any tool is served: a restart must not release a pause.
+  policy.usePauseStore(metaPauseStore(agentJournal.db));
   const registry = new ApproverRegistry(kakao.config.dataDir);
   const approvals = new ApprovalStore(agentJournal, registry, Date.now, { clientConfirmations: kakao.config.approval.clientConfirm });
   const approvalWindow = approvalWindowFromConfig(kakao.config.approval);
